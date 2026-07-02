@@ -1,0 +1,15 @@
+@import './variables.css';
+@import './layout.css';
+@import './todo.css';
+@import './components.css';
+@import './ai-modal.css';
+
+/* ========== Responsive ========== */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .topbar { padding: 16px 20px 10px; }
+  .add-todo-area { padding: 8px 20px 10px; }
+  .todo-list-container { padding: 0 20px 20px; }
+  .search-box { width: 180px; }
+  .todo-actions { opacity: 1; }
+}

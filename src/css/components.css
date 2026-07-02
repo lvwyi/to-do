@@ -1,0 +1,150 @@
+/* ========== Modal ========== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+}
+
+/* Show the overlay when open — supports both 'open' and 'modal-open' class names */
+.modal-overlay.open,
+.modal-overlay.modal-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 28px;
+  width: 440px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  transform: scale(0.95);
+  transition: transform 0.2s ease;
+}
+
+.modal-overlay.open .modal,
+.modal-overlay.modal-open .modal {
+  transform: scale(1);
+}
+
+.modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font);
+  outline: none;
+  transition: all var(--transition);
+}
+
+.form-group textarea { resize: vertical; min-height: 70px; }
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(67,97,238,0.15);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+/* ========== Toast ========== */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  padding: 12px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: slideInRight 0.3s ease;
+  min-width: 250px;
+}
+
+.toast.hiding { animation: slideOutRight 0.3s ease forwards; }
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideOutRight {
+  to { opacity: 0; transform: translateX(40px); }
+}
+
+.toast .undo-btn {
+  margin-left: auto;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: var(--font);
+  font-size: 13px;
+}
+
+.toast .undo-btn:hover { text-decoration: underline; }
+
+/* ========== Category Color Tags ========== */
+.cat-work { background: #dbeafe !important; color: #2563eb !important; }
+.cat-personal { background: #fce7f3 !important; color: #db2777 !important; }
+.cat-health { background: #d1fae5 !important; color: #059669 !important; }
+.cat-study { background: #fef3c7 !important; color: #d97706 !important; }
+.cat-shopping { background: #ede9fe !important; color: #7c3aed !important; }
+
+[data-theme="dark"] .cat-work { background: #1e3a5f !important; color: #60a5fa !important; }
+[data-theme="dark"] .cat-personal { background: #4a1942 !important; color: #f472b6 !important; }
+[data-theme="dark"] .cat-health { background: #14532d !important; color: #34d399 !important; }
+[data-theme="dark"] .cat-study { background: #451a03 !important; color: #fbbf24 !important; }
+[data-theme="dark"] .cat-shopping { background: #2e1065 !important; color: #a78bfa !important; }

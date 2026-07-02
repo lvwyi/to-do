@@ -1,0 +1,64 @@
+/* ========== CSS Variables / Theme ========== */
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface-hover: #f8f9fa;
+  --text: #1a1a2e;
+  --text-secondary: #6c757d;
+  --text-muted: #adb5bd;
+  --border: #e0e0e0;
+  --primary: #4361ee;
+  --primary-light: #eef0ff;
+  --primary-dark: #3a56d4;
+  --danger: #ef476f;
+  --danger-light: #fef0f3;
+  --success: #06d6a0;
+  --success-light: #eafbf5;
+  --warning: #ffd166;
+  --warning-light: #fff8e6;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --transition: 0.2s ease;
+  --font: "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+[data-theme="dark"] {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-hover: #1c2333;
+  --text: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #484f58;
+  --border: #30363d;
+  --primary: #5c7cfa;
+  --primary-light: #1a1f36;
+  --primary-dark: #748ffc;
+  --danger: #f783ac;
+  --danger-light: #2d1222;
+  --success: #7ee787;
+  --success-light: #13291e;
+  --warning: #ffa657;
+  --warning-light: #2d2006;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.4);
+}
+
+/* ========== Reset & Base ========== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background var(--transition), color var(--transition);
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+}
