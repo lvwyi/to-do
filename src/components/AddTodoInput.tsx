@@ -1,11 +1,7 @@
 import { useState } from 'react';
 import { useTodoApp } from '../hooks/useAppState';
 
-interface Props {
-  onAIButtonClick?: () => void;
-}
-
-export default function AddTodoInput({ onAIButtonClick }: Props) {
+export default function AddTodoInput() {
   const { addTodo, categoryFilter } = useTodoApp();
   const [text, setText] = useState('');
   const defaultCategory = categoryFilter ?? 'work';
@@ -26,17 +22,8 @@ export default function AddTodoInput({ onAIButtonClick }: Props) {
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
+          data-focus-target="add-todo"
         />
-        {onAIButtonClick && (
-          <button
-            className="btn btn-ghost"
-            onClick={onAIButtonClick}
-            title="AI 智能拆解任务"
-            style={{ borderStyle: 'dashed' }}
-          >
-            &#x1F916; AI
-          </button>
-        )}
         <button className="btn btn-primary" onClick={handleAdd}>✚ 添加</button>
       </div>
     </div>

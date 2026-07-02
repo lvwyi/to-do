@@ -11,15 +11,12 @@ export default function DeleteModal() {
   useEffect(() => {
     const handler = (e: Event) => {
       const id = (e as CustomEvent).detail as string;
-      console.log('[DeleteModal] open-delete received, id:', id);
       setTodoId(id);
       setOpen(true);
     };
     window.addEventListener('open-delete', handler);
-    console.log('[DeleteModal] registering open-delete listener');
     return () => {
       window.removeEventListener('open-delete', handler);
-      console.log('[DeleteModal] removing open-delete listener');
     };
   }, []);
 
@@ -38,7 +35,6 @@ export default function DeleteModal() {
   if (!todo) return null;
 
   const handleConfirm = () => {
-    console.log('[DeleteModal] confirming delete:', todoId);
     deleteTodo(todoId);
     setOpen(false);
     showToast(`"${todo.text}" 已删除`, () => undoDelete(todo));

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTodoApp } from '../hooks/useAppState';
 import type { ViewType } from '../types';
+import { todayStr } from '../utils/helpers';
 
 const VIEWS: { key: ViewType; icon: string; label: string }[] = [
   { key: 'all', icon: '📋', label: '全部事项' },
@@ -11,7 +12,7 @@ const VIEWS: { key: ViewType; icon: string; label: string }[] = [
 
 export default function SidebarNav() {
   const { view, todos, switchView } = useTodoApp();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
 
   const counts = useMemo(() => ({
     all: todos.filter(t => !t.completed).length,

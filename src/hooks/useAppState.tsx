@@ -50,9 +50,14 @@ function reducer(state: InternalState, action: Action): InternalState {
       return { ...state, categories: [...state.categories, action.payload as Category] };
     }
     case 'DELETE_CATEGORY': {
+      const catId = action.payload as string;
       return {
         ...state,
-        categories: state.categories.filter(c => c.id !== (action.payload as string)),
+        categories: state.categories.filter(c => c.id !== catId),
+        // Reassign orphaned todos to default 'personal' category
+        todos: state.todos.map(t =>
+          t.category === catId ? { ...t, category: 'personal' } : t
+        ),
       };
     }
     case 'SET_VIEW': {
@@ -92,8 +97,8 @@ export interface TodoAppContextValue extends AppState {
   setSearch: (q: string) => void;
   setSort: (s: SortOrder) => void;
   toggleTheme: () => void;
-  showToast: (text: string, undoAction: () => void) => void;
-  removeToast: (id: string) => void;
+  /** Show a toast notification. Pass `undoAction` for delete-confirm toasts. */
+  showToast: (text: string, undoAction?: () => void) => void;
 }
 
 const Ctx = createContext<TodoAppContextValue | null>(null);
@@ -182,16 +187,12 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_SORT', payload: s });
   }, []);
 
-  const showToast = useCallback((text: string, undoAction: () => void) => {
+  const showToast = useCallback((text: string, undoAction?: () => void) => {
     const id = genId();
     setToasts(prev => [...prev, { id, text, undoAction }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 5000);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
   // --- Build context value from actual state ---
@@ -206,7 +207,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     toasts,
     addTodo, toggleTodo, updateTodo, deleteTodo, undoDelete,
     addCategory, deleteCategory, switchView, switchCategory,
-    setSearch, setSort, toggleTheme, showToast, removeToast,
+    setSearch, setSort, toggleTheme, showToast,
   };
 
   return (

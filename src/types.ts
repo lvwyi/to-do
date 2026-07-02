@@ -35,5 +35,5 @@ export type SortOrder =
 export interface ToastMessage {
   id: string;
   text: string;
-  undoAction: () => void;
+  undoAction?: () => void;
 }

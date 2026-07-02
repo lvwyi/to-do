@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTodoApp } from '../hooks/useAppState';
-import { getCategoryColor } from '../utils/helpers';
+import { getCategoryColor, genId } from '../utils/helpers';
 
 const DEFAULT_CAT_IDS = new Set(['work', 'personal', 'health', 'study', 'shopping']);
 const COLOR_SWATCHES = [
@@ -22,8 +22,14 @@ export default function CategoryList() {
   const handleSave = () => {
     const name = catName.trim();
     if (!name) return;
-    const baseId = name.slice(0, 10).toLowerCase().replace(/[^a-z一-龥]/g, '') || Date.now().toString(36);
-    const id = categories.find(c => c.id === baseId) ? baseId + '_' + Date.now().toString(36) : baseId;
+    // Generate stable baseId: prefer readable chars from name
+    const baseId = name.slice(0, 10).toLowerCase().replace(/[^a-z一-鿿]/g, '') || genId();
+    // Collision check: retry with appended timestamp suffix until unique
+    let id = baseId;
+    let attempt = 0;
+    while (categories.find(c => c.id === id)) {
+      id = `${baseId}_${attempt++}_${Date.now().toString(36)}`;
+    }
     addCategory({ id, name });
     setCatName('');
     setShowModal(false);

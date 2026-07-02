@@ -31,9 +31,7 @@ export function isOverdue(dateStr: string): boolean {
 export const PRIORITY_ORDER: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
 export function escapeHtml(s: string): string {
-  const div = document.createElement('div');
-  div.textContent = s;
-  return div.innerHTML;
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /** Get category display color */

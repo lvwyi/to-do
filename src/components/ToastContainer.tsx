@@ -1,7 +1,7 @@
 import { useTodoApp } from '../hooks/useAppState';
 
 export default function ToastContainer() {
-  const { toasts, removeToast } = useTodoApp();
+  const { toasts } = useTodoApp();
 
   if (toasts.length === 0) return null;
 
@@ -10,15 +10,19 @@ export default function ToastContainer() {
       {toasts.map(toast => (
         <div className="toast" key={toast.id}>
           <span>{toast.text}</span>
-          <button
-            className="undo-btn"
-            onClick={() => {
-              toast.undoAction();
-              removeToast(toast.id);
-            }}
-          >
-            撤销
-          </button>
+          {toast.undoAction && (
+            <button
+              className="undo-btn"
+              onClick={() => {
+                // Execute undo callback — captures the exact deleted todo at creation time.
+                // No manual removeToast call: the 5s auto-timer handles cleanup.
+                // This eliminates the race condition where removeToast could fire before re-render completes.
+                toast.undoAction();
+              }}
+            >
+              撤销
+            </button>
+          )}
         </div>
       ))}
     </div>

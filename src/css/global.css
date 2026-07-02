@@ -2,7 +2,6 @@
 @import './layout.css';
 @import './todo.css';
 @import './components.css';
-@import './ai-modal.css';
 
 /* ========== Responsive ========== */
 @media (max-width: 768px) {

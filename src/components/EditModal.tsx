@@ -16,12 +16,8 @@ export default function EditModal() {
   useEffect(() => {
     const handler = (e: Event) => {
       const id = (e as CustomEvent).detail as string;
-      console.log('[EditModal] open-edit event received, id:', id);
       const todo = todos.find(t => t.id === id);
-      if (!todo) {
-        console.warn('[EditModal] todo not found for id:', id);
-        return;
-      }
+      if (!todo) return;
       setTodoId(id);
       setText(todo.text);
       setDescription(todo.description || '');
@@ -31,10 +27,8 @@ export default function EditModal() {
       setOpen(true);
     };
     window.addEventListener('open-edit', handler);
-    console.log('[EditModal] registering open-edit listener');
     return () => {
       window.removeEventListener('open-edit', handler);
-      console.log('[EditModal] removing open-edit listener');
     };
   	}, []);
 
@@ -49,7 +43,6 @@ export default function EditModal() {
 
   const handleSave = () => {
     if (!todoId || !text.trim()) return;
-    console.log('[EditModal] saving:', { id: todoId, text: text.trim() });
     updateTodo(todoId, { text: text.trim(), description: description.trim(), priority, category, due });
     setOpen(false);
   };

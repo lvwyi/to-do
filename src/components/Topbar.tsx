@@ -1,4 +1,5 @@
 import { useTodoApp } from '../hooks/useAppState';
+import type { SortOrder } from '../types';
 
 const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: 'created-desc', label: '最新创建' },
@@ -42,13 +43,14 @@ export default function Topbar() {
           placeholder="搜索待办…"
           value={search}
           onChange={e => setSearch(e.target.value)}
+          data-focus-target="search"
         />
       </div>
       <div className="topbar-actions">
         <select
           className="sort-select"
           value={sort}
-          onChange={e => setSort(e.target.value as typeof sort)}
+          onChange={e => setSort(e.target.value as SortOrder)}
         >
           {SORT_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
