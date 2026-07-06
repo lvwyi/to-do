@@ -24,6 +24,8 @@ export interface AppState {
 
 export type ViewType = 'all' | 'today' | 'upcoming' | 'completed';
 
+export type MainView = 'todos' | 'meeting';
+
 export type SortOrder =
   | 'created-desc'
   | 'created-asc'

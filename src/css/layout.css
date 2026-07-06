@@ -336,3 +336,60 @@
 
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-danger:hover { opacity: 0.9; }
+
+/* ========== Meeting Toggle Button in Topbar ========== */
+.meeting-toggle-btn {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+.meeting-toggle-btn:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+.meeting-toggle-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ========== View Mode Tabs (below topbar) ========== */
+.view-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px 32px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.view-tab {
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition);
+  position: relative;
+  top: 1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.view-tab:hover { color: var(--text); }
+
+.view-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}

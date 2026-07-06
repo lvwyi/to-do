@@ -9,7 +9,9 @@
       "Bash(ls .claude/agents/)",
       "Bash(node -e ' *)",
       "Bash(python3)",
-      "Bash(node)"
+      "Bash(node)",
+      "Bash(bash ~/.claude/statusline.sh)",
+      "Bash(node ~/.claude/statusline_parse.js)"
     ]
   }
 }

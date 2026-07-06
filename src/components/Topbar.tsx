@@ -1,5 +1,5 @@
 import { useTodoApp } from '../hooks/useAppState';
-import type { SortOrder } from '../types';
+import type { SortOrder, MainView } from '../types';
 
 const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: 'created-desc', label: '最新创建' },
@@ -19,7 +19,12 @@ const SUBTITLES: Record<string, string> = {
   upcoming: '未来 7 天的到期事项', completed: '已完成的记录',
 };
 
-export default function Topbar() {
+interface TopbarProps {
+  onMeetingClick: () => void;
+  currentView: MainView;
+}
+
+export default function Topbar({ onMeetingClick, currentView }: TopbarProps) {
   const { view, categoryFilter, search, setSearch, sort, setSort, categories } = useTodoApp();
 
   let title = categoryFilter
@@ -56,6 +61,13 @@ export default function Topbar() {
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
+        <button
+          className={`meeting-toggle-btn ${currentView === 'meeting' ? 'active' : ''}`}
+          onClick={onMeetingClick}
+          title="切换至会议智能助手（Ctrl+Shift+M）"
+        >
+          🤖
+        </button>
       </div>
     </div>
   );
