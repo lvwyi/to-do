@@ -73,8 +73,7 @@ export default function AddTodoInput() {
 
       showToast(`已拆解为 ${tasks.length} 个任务 ✨`);
       setText('');
-    } catch (err) {
-      console.error('[AI Breakdown] failed:', err);
+    } catch {
       showToast('AI 拆解失败，请稍后重试');
     } finally {
       setAiLoading(false);
