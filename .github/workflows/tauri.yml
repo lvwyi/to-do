@@ -28,29 +28,25 @@ jobs:
           path: |
             ~/.cargo/registry/index/
             ~/.cargo/git/db/
-            todo-app/src-tauri/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('todo-app/src-tauri/Cargo.lock') }}
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
 
       - name: Install deps
         shell: pwsh
-        run: npm ci --prefer-offline --no-audit 2>&1 || npm install --prefer-offline --no-audit 2>&1
-        working-directory: ./todo-app
+        run: cd todo-app; npm ci --prefer-offline --no-audit 2>&1 || npm install --prefer-offline --no-audit 2>&1
 
       - name: Build frontend
         shell: pwsh
-        run: npm run build 2>&1
-        working-directory: ./todo-app
+        run: cd todo-app; npm run build 2>&1
 
       - name: Tauri build
         shell: pwsh
-        run: npx tauri build 2>&1
-        working-directory: ./todo-app
+        run: cd todo-app; npx tauri build 2>&1
         timeout-minutes: 60
 
       - name: List output files
         shell: pwsh
-        run: Get-ChildItem -Recurse src-tauri/target/release/bundle/
-        working-directory: ./todo-app
+        run: Get-ChildItem -Recurse todo-app/src-tauri/target/release/bundle/
 
       - name: Upload artifact
         if: success()
