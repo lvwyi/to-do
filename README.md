@@ -28,3 +28,4 @@ cp .env.example .env.local
 ```
 
 获取 API Key：https://dashscope.console.aliyun.com/apiKey
+# Tauri CI update 225719
