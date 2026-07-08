@@ -1,10 +1,12 @@
-name: Build Tauri Windows App
+name: BuildWindowsApp
 
 on:
   push:
     branches: [master]
-    paths:
-      - 'todo-app/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build-tauri:
@@ -23,26 +25,26 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Rust dependencies
+      - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/git/db/
-            src-tauri/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+            todo-app/src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('todo-app/src-tauri/Cargo.lock') }}
 
-      - name: Install frontend dependencies
+      - name: Install frontend deps
         run: npm ci || npm install
+        working-directory: todo-app
 
-      - name: Build app
+      - name: Tauri build
         run: npx tauri build
 
-      - name: Upload artifact
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: 待办事项-windows-installer
+          name: todosetup
           path: |
-            src-tauri/target/release/bundle/nsis/待办事项_0.1.0_x64-setup.exe
+            todo-app/src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
