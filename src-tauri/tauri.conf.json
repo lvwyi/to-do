@@ -4,7 +4,9 @@
   "identifier": "com.lvwyi.todo-app",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:5173"
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm run dev"
   },
   "bundle": {
     "active": true,

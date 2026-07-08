@@ -32,7 +32,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
 
       - name: Install deps
-        run: npm ci --no-audit || npm install --no-audit
+        run: npm install --no-audit
 
       - name: Tauri build
         working-directory: ./src-tauri
