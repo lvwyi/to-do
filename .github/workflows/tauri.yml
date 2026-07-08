@@ -32,24 +32,24 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('todo-app/src-tauri/Cargo.lock') }}
 
       - name: Install deps
-        shell: bash
-        run: npm ci || npm install
+        shell: pwsh
+        run: npm ci --prefer-offline --no-audit 2>&1 || npm install --prefer-offline --no-audit 2>&1
         working-directory: ./todo-app
 
       - name: Build frontend
-        shell: bash
-        run: npm run build
+        shell: pwsh
+        run: npm run build 2>&1
         working-directory: ./todo-app
 
       - name: Tauri build
-        shell: bash
-        run: npx tauri build --verbose
+        shell: pwsh
+        run: npx tauri build 2>&1
         working-directory: ./todo-app
-        timeout-minutes: 30
+        timeout-minutes: 60
 
-      - name: Upload installer
-        shell: bash
-        run: ls -la src-tauri/target/release/bundle/nsis/
+      - name: List output files
+        shell: pwsh
+        run: Get-ChildItem -Recurse src-tauri/target/release/bundle/
         working-directory: ./todo-app
 
       - name: Upload artifact
