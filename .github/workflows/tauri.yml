@@ -31,27 +31,18 @@ jobs:
             src-tauri/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
 
-      - name: Install deps
-        shell: pwsh
-        run: cd todo-app; npm ci --prefer-offline --no-audit 2>&1 || npm install --prefer-offline --no-audit 2>&1
-
-      - name: Build frontend
-        shell: pwsh
-        run: cd todo-app; npm run build 2>&1
+      - name: Install frontend deps
+        working-directory: ./todo-app
+        run: npm ci
 
       - name: Tauri build
-        shell: pwsh
-        run: cd todo-app; npx tauri build 2>&1
+        working-directory: ./todo-app
+        run: npx tauri build
         timeout-minutes: 60
 
-      - name: List output files
-        shell: pwsh
-        run: Get-ChildItem -Recurse todo-app/src-tauri/target/release/bundle/
-
-      - name: Upload artifact
-        if: success()
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: todosetup
-          path: todo-app/src-tauri/target/release/bundle/nsis/*-setup.exe
+          path: ./todo-app/src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
