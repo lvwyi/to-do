@@ -1,0 +1,48 @@
+name: Build Tauri Windows App
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'todo-app/**'
+
+jobs:
+  build-tauri:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: todo-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+
+      - name: Install frontend dependencies
+        run: npm ci || npm install
+
+      - name: Build app
+        run: npx tauri build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 待办事项-windows-installer
+          path: |
+            src-tauri/target/release/bundle/nsis/待办事项_0.1.0_x64-setup.exe
+          if-no-files-found: error
