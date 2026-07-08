@@ -32,19 +32,28 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('todo-app/src-tauri/Cargo.lock') }}
 
       - name: Install deps
+        shell: bash
         run: npm ci || npm install
         working-directory: ./todo-app
 
       - name: Build frontend
+        shell: bash
         run: npm run build
         working-directory: ./todo-app
 
       - name: Tauri build
-        run: npx tauri build
+        shell: bash
+        run: npx tauri build --verbose
         working-directory: ./todo-app
         timeout-minutes: 30
 
       - name: Upload installer
+        shell: bash
+        run: ls -la src-tauri/target/release/bundle/nsis/
+        working-directory: ./todo-app
+
+      - name: Upload artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: todosetup
