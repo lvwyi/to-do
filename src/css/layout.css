@@ -304,6 +304,32 @@
   box-shadow: 0 0 0 3px rgba(67,97,238,0.15);
 }
 
+/* ========== AI Breakdown Row ========== */
+.add-todo-ai-row {
+  padding-top: 4px;
+}
+
+.btn-ai {
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+  color: #fff;
+  padding: 6px 16px;
+  font-size: 13px;
+  opacity: 1;
+}
+
+.btn-ai:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 12px rgba(124,58,237,0.35);
+  opacity: 1;
+}
+
+.btn-ai:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .btn {
   padding: 10px 20px;
   border: none;

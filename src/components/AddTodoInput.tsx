@@ -1,9 +1,17 @@
 import { useState } from 'react';
 import { useTodoApp } from '../hooks/useAppState';
+import { callAi, type AiMessage } from '../utils/aiApi';
+
+interface SubTask {
+  text: string;
+  description?: string;
+  priority: 'low' | 'medium' | 'high';
+}
 
 export default function AddTodoInput() {
-  const { addTodo, categoryFilter } = useTodoApp();
+  const { addTodo, categoryFilter, showToast } = useTodoApp();
   const [text, setText] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
   const defaultCategory = categoryFilter ?? 'work';
 
   const handleAdd = () => {
@@ -11,6 +19,66 @@ export default function AddTodoInput() {
     if (!trimmed) return;
     addTodo({ text: trimmed, description: '', priority: 'medium', category: defaultCategory, due: '', completed: false });
     setText('');
+  };
+
+  /**
+   * 将用户的模糊输入（如"准备季度汇报"）拆成多个可执行的子任务，并批量添加。
+   */
+  const handleAiBreakdown = async () => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    setAiLoading(true);
+    try {
+      const messages: AiMessage[] = [
+        {
+          role: 'system',
+          content: `你是一个任务拆解助手。用户会输入一个模糊的目标或大任务，你需要将其拆分为 3-8 个具体、可立即执行的小任务。
+请严格按以下 JSON 格式回复，不要添加任何其他文字：
+[{"text":"子任务标题","description":"简要说明怎么做","priority":"high|medium|low"}]
+每个任务的 text 字段不超过 20 个字。`,
+        },
+        {
+          role: 'user',
+          content: trimmed,
+        },
+      ];
+
+      const raw = await callAi({ model: 'qwen-plus', messages });
+      let jsonStr = raw.trim();
+
+      // 清理 LLM 可能包裹的 markdown 代码块标记
+      const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
+
+      const tasks: SubTask[] = JSON.parse(jsonStr);
+
+      if (!Array.isArray(tasks) || tasks.length === 0) {
+        showToast('AI 返回格式异常，已作为单条待办保存');
+        addTodo({ text: trimmed, description: '', priority: 'medium', category: defaultCategory, due: '', completed: false });
+        setText('');
+        return;
+      }
+
+      for (const t of tasks) {
+        addTodo({
+          text: t.text,
+          description: t.description ?? '',
+          priority: t.priority as SubTask['priority'] ?? 'medium',
+          category: defaultCategory,
+          due: '',
+          completed: false,
+        });
+      }
+
+      showToast(`已拆解为 ${tasks.length} 个任务 ✨`);
+      setText('');
+    } catch (err) {
+      console.error('[AI Breakdown] failed:', err);
+      showToast('AI 拆解失败，请稍后重试');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   return (
@@ -25,6 +93,17 @@ export default function AddTodoInput() {
           data-focus-target="add-todo"
         />
         <button className="btn btn-primary" onClick={handleAdd}>✚ 添加</button>
+      </div>
+
+      <div className="add-todo-ai-row">
+        <button
+          className="btn btn-ai"
+          disabled={aiLoading || !text.trim()}
+          onClick={handleAiBreakdown}
+          title="用 AI 智能拆解为多个子任务"
+        >
+          {aiLoading ? '⏳ 拆解中…' : '✨ 智能拆解'}
+        </button>
       </div>
     </div>
   );
