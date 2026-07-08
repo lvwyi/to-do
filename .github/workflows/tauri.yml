@@ -13,7 +13,7 @@ jobs:
     runs-on: windows-latest
     defaults:
       run:
-        working-directory: todo-app
+        working-directory: ./todo-app
     steps:
       - uses: actions/checkout@v4
 
@@ -36,7 +36,6 @@ jobs:
 
       - name: Install frontend deps
         run: npm ci || npm install
-        working-directory: todo-app
 
       - name: Tauri build
         run: npx tauri build
