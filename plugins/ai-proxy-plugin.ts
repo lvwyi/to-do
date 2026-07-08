@@ -1,23 +1,39 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import type { Plugin } from 'vite';
 
 interface DashScopeResponse {
-  output?: { choices?: Array<{ message: { content: string } }> };
+  output?: { choices?: Array<{ message: { content: string } }> | []; text?: string };
   code?: string;
   message?: string;
 }
 
-/**
- * Vite 插件：开发时将 /api/ai POST 请求直接代理到 DashScope。
- * 生产环境不生效（apply: 'serve'），由部署的 Cloudflare Worker 处理。
- *
- * 好处：无需单独开终端跑 Wrangler，一个 npm run dev 搞定全部。
- */
+// —— 加载 .env / .env.local（开发环境取 AI Key）——
+function loadEnvFile(name: string): Record<string, string> {
+  const p = join(process.cwd(), name);
+  try {
+    return readFileSync(p, 'utf-8')
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !l.startsWith('#'))
+      .reduce((acc, line) => {
+        const [k, ...rest] = line.split('=');
+        acc[k.trim()] = rest.join('=').trim();
+        return acc;
+      }, {} as Record<string, string>);
+  } catch {
+    return {};
+  }
+}
+const envLocal = loadEnvFile('.env.local');
+const envBase   = loadEnvFile('.env');
+for (const [k, v] of Object.entries(envLocal)) process.env[k] = v;
+for (const [k, v] of Object.entries(envBase))   if (!process.env[k]) process.env[k] = v;
+
+/** 仅在开发服务器（npm run dev）生效 */
 export function aiProxyPlugin(): Plugin {
   return {
     name: 'todo-ai-proxy',
-
-    /** 仅在开发服务器（npm run dev）生效 */
-    apply: 'serve',
 
     configureServer(server) {
       // 在 Vite 的内部中间件栈中插入我们的处理器
@@ -90,7 +106,8 @@ async function handleAiRequest(
       return;
     }
 
-    const content = data.output?.choices?.[0]?.message?.content ?? '';
+    // 兼容新旧格式：新版本返回 output.text，旧版输出 output.choices[0].message.content
+    const content = data.output?.text ?? data.output?.choices?.[0]?.message?.content ?? '';
     console.log(`[AI] ✓ ${content.length} chars`);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, content }));
