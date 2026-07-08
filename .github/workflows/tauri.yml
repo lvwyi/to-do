@@ -11,6 +11,9 @@ permissions:
 jobs:
   build-tauri:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -31,18 +34,17 @@ jobs:
             src-tauri/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
 
-      - name: Install frontend deps
-        working-directory: ./todo-app
-        run: npm ci
+      - name: Install deps
+        run: npm install
 
       - name: Tauri build
-        working-directory: ./todo-app
         run: npx tauri build
         timeout-minutes: 60
 
       - name: Upload installer
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: todosetup
-          path: ./todo-app/src-tauri/target/release/bundle/nsis/*-setup.exe
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
