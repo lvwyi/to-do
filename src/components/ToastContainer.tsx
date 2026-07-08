@@ -17,7 +17,7 @@ export default function ToastContainer() {
                 // Execute undo callback — captures the exact deleted todo at creation time.
                 // No manual removeToast call: the 5s auto-timer handles cleanup.
                 // This eliminates the race condition where removeToast could fire before re-render completes.
-                toast.undoAction();
+                toast.undoAction && toast.undoAction();
               }}
             >
               撤销
