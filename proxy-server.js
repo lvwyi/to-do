@@ -73,15 +73,14 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    const targetUrl = new URL(baseUrl.endsWith('/v1') ? `${baseUrl}/chat-messages` : `${baseUrl}/v1/chat-messages`);
+    const targetUrl = new URL(baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`);
     const isHttps = targetUrl.protocol === 'https:';
     const client = isHttps ? https : http;
 
     const payload = JSON.stringify({
-      query,
-      conversation_id: body.conversation_id ?? '',
-      inputs: {},
+      inputs: { string: query },
       response_mode: 'blocking',
+      user: 'todo-app-client',
     });
 
     const apiRes = await new Promise((resolve, reject) => {
@@ -109,8 +108,8 @@ const server = createServer(async (req, res) => {
     }
     const respData = JSON.parse(Buffer.concat(respChunks).toString());
 
-    // Dify chat-messages 同步模式返回顶层 answer 字段
-    const content = respData.answer ?? '';
+    // Dify workflow 同步模式返回 data.outputs.out
+    const content = respData.data?.outputs?.out ?? '';
 
     res.writeHead(200, {
       'Content-Type': 'application/json',

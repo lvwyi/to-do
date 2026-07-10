@@ -5,7 +5,7 @@ import type { Plugin } from 'vite';
 interface DifyResponse {
   code?: string;
   message?: string;
-  answer?: string;
+  data?: { outputs?: Record<string, string>; status?: number };
 }
 
 // —— 加载 .env / .env.local（开发环境取 AI Key）——
@@ -85,10 +85,10 @@ async function handleAiRequest(
       return;
     }
 
-    console.log(`[AI] → Dify (${query.slice(0, 30)}...)`);
+    console.log(`[AI] → Dify workflow (${query.slice(0, 30)}...)`);
 
-    // 解析 baseUrl，支持带 https:// 前缀的情况
-    const url = new URL(baseUrl.endsWith('/v1') ? `${baseUrl}/chat-messages` : `${baseUrl}/v1/chat-messages`);
+    // Workflow 应用使用 /v1/workflows/run 端点
+    const url = new URL(baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`);
 
     const dashRes = await fetch(url.toString(), {
       method: 'POST',
@@ -97,15 +97,20 @@ async function handleAiRequest(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        query,
-        conversation_id: body.conversation_id ?? '',
-        inputs: {},
+        inputs: { string: query },
         response_mode: 'blocking',
+        user: 'todo-app-client',
       }),
     });
 
     const data = await dashRes.json() as DifyResponse;
 
+    if (data.detail?.error) {
+      console.error(`[AI] ✗ ${data.detail.error}`);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: data.detail.error }));
+      return;
+    }
     if (data.code) {
       console.error(`[AI] ✗ ${data.code}: ${data.message}`);
       res.writeHead(dashRes.status, { 'Content-Type': 'application/json' });
@@ -113,8 +118,8 @@ async function handleAiRequest(
       return;
     }
 
-    // Dify chat-messages 同步模式返回顶层 answer 字段
-    const content = data.answer ?? '';
+    // Dify workflow 同步模式返回 data.outputs.out
+    const content = data.data?.outputs?.out ?? '';
     console.log(`[AI] ✓ ${content.length} chars`);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, content }));

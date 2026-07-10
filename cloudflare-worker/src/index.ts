@@ -75,7 +75,7 @@ export default {
     }
 
     const targetUrl = new URL(
-      baseUrl.endsWith('/v1') ? `${baseUrl}/chat-messages` : `${baseUrl}/v1/chat-messages`,
+      baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`,
     );
 
     try {
@@ -86,16 +86,21 @@ export default {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query,
-          conversation_id: body.conversation_id ?? '',
-          inputs: {},
+          inputs: { string: query },
           response_mode: 'blocking',
+          user: 'todo-app-client',
         }),
       });
 
       const data = await res.json();
 
       // 统一错误格式
+      if (data.detail?.error) {
+        return new Response(
+          JSON.stringify({ error: data.detail.error }),
+          { status: 400, headers: { ...corsHeaders(url), 'Content-Type': 'application/json' } },
+        );
+      }
       if (data.code) {
         return new Response(
           JSON.stringify({ error: `${data.code}: ${data.message}` }),
@@ -103,8 +108,8 @@ export default {
         );
       }
 
-      // Dify chat-messages 同步模式返回顶层 answer 字段
-      const content = data.answer ?? '';
+      // Dify workflow 同步模式返回 data.outputs.out
+      const content = data.data?.outputs?.out ?? '';
 
       return new Response(
         JSON.stringify({ success: true, content }),

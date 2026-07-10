@@ -24,6 +24,13 @@ interface AiResponse {
   error?: string;
 }
 
+/** Dify Workflow 响应格式 */
+interface DifyWorkflowResponse {
+  event?: string;
+  detail?: { error?: string };
+  data?: { outputs?: Record<string, string>; status?: number };
+}
+
 // 开发环境本地代理
 const PROXY = import.meta.env.VITE_AI_PROXY_URL ?? '/api';
 
@@ -61,17 +68,23 @@ export async function callAi(options: AiCallOptions): Promise<string> {
   }
 
   // Web 模式 → HTTP 请求到 Vite 插件或外部代理
-  const res = await fetch(`${PROXY}/ai`, {
+  const baseUrl = import.meta.env.VITE_DIFY_BASE_URL || 'http://127.0.0.1/v1';
+  const res = await fetch(`${baseUrl}/v1/workflows/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({
+      inputs: { string: query },
+      response_mode: 'blocking',
+      user: 'todo-app-client',
+    }),
   });
 
   if (!res.ok) {
     throw new Error(`AI 请求失败 (${res.status})`);
   }
 
-  const data: AiResponse = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data.content ?? '';
+  const data: DifyWorkflowResponse = await res.json();
+  if (data.detail?.error) throw new Error(data.detail.error);
+  const content = data.data?.outputs?.out ?? '';
+  return content;
 }
