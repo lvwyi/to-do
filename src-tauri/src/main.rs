@@ -2,14 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 struct AiCallArgs {
-    model: Option<String>,
-    messages: Vec<Message>,
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-struct Message {
-    role: String,
-    content: String,
+    query: String,
+    conversation_id: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -20,20 +14,25 @@ struct AiResponse {
 
 #[tauri::command]
 async fn call_ai(args: AiCallArgs) -> Result<AiResponse, String> {
-    let api_key = "sk-ws-H.RXIHRIL.iLUo.MEYCIQDEkt0bC7SOrIV3vHGvggPDipGl1iiv-VUWSDG-tBGyXgIhAJ_kmA7btLzoJyl6pSwFH96ZKN7uHGJTFrVisLZCwcma";
+    let api_key = std::env::var("DIFY_API_KEY").map_err(|e| format!("DIFY_API_KEY not set: {}", e))?;
+    let base_url = std::env::var("DIFY_BASE_URL").unwrap_or_else(|_| "https://api.dify.ai".into());
+
+    let url = if base_url.ends_with("/v1") {
+        format!("{}/chat-messages", base_url)
+    } else {
+        format!("{}/v1/chat-messages", base_url)
+    };
 
     let client = reqwest::Client::new();
-    let model = args.model.unwrap_or_else(|| "qwen-plus".into());
-
     let resp = client
-        .post("https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation")
+        .post(&url)
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
-        .header("X-DashScope-SSE", "disable")
         .json(&serde_json::json!({
-            "model": model,
-            "input": { "messages": args.messages },
-            "parameters": { "incremental_output": false }
+            "query": args.query,
+            "conversation_id": args.conversation_id.unwrap_or_default(),
+            "inputs": {},
+            "response_mode": "blocking"
         }))
         .send()
         .await
@@ -41,9 +40,9 @@ async fn call_ai(args: AiCallArgs) -> Result<AiResponse, String> {
 
     let text: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
 
-    let content = text["output"]["text"]
+    // Dify chat-messages 同步模式返回顶层 answer 字段
+    let content = text["answer"]
         .as_str()
-        .or_else(|| text["output"]["choices"][0]["message"]["content"].as_str())
         .unwrap_or("");
 
     Ok(AiResponse {

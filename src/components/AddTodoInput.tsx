@@ -32,13 +32,6 @@ export default function AddTodoInput() {
     try {
       const messages: AiMessage[] = [
         {
-          role: 'system',
-          content: `你是一个任务拆解助手。用户会输入一个模糊的目标或大任务，你需要将其拆分为 3-8 个具体、可立即执行的小任务。
-请严格按以下 JSON 格式回复，不要添加任何其他文字：
-[{"text":"子任务标题","description":"简要说明怎么做","priority":"high|medium|low"}]
-每个任务的 text 字段不超过 20 个字。`,
-        },
-        {
           role: 'user',
           content: trimmed,
         },

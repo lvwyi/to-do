@@ -30,3 +30,4 @@ computer/
 
 # Build output
 build/
+src-tauri/target/

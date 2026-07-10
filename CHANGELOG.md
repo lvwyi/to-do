@@ -51,3 +51,53 @@ docker build -t todo-app . && docker restart todo-app  # 重新构建
 commit ccb2142 feat: 集成会议智能助手
 commit 4054579 fix: remove duplicate text/html from gzip_types
 ```
+
+---
+
+## v1.3 — AI 智能拆解迁移至 Dify 平台 & 安全加固
+
+**日期：** 2026-07-10
+
+### ✨ 核心变更
+
+| 组件 | 变更 |
+|------|------|
+| `src/utils/aiApi.ts` | 重写：删除 DashScope 直连，改用 Dify `/v1/chat-messages` 端点 |
+| `src/components/AddTodoInput.tsx` | 简化：移除内联 system prompt（已固化在 Dify 工作流中），删除 `model` 参数 |
+| `plugins/ai-proxy-plugin.ts` | 修改：从死代码激活为 Vite 开发代理，目标端点改为 Dify |
+| `vite.config.ts` | 新增：集成 aiProxyPlugin（仅开发环境启用） |
+| `proxy-server.js` | 重写：Node.js 代理改为 Dify 格式，清理未使用的 dotenv 依赖 |
+| `cloudflare-worker/src/index.ts` | 重写：Cloudflare Worker 改为 Dify 格式 |
+| `src-tauri/src/main.rs` | 重写：移除硬编码 API Key，改用环境变量 `DIFY_API_KEY`，请求改为 Dify 格式 |
+
+### 🔒 安全修复
+
+| 问题 | 解决方案 |
+|------|----------|
+| Tauri Rust 源码中硬编码 DashScope API Key | 替换为 `std::env::var("DIFY_API_KEY")` 读取，密钥不再暴露在二进制文件中 |
+| 所有代理层统一迁移到 Dify | 不再直接暴露任何第三方 LLM 供应商凭证 |
+
+### 🔧 架构升级
+
+| 变更 | 说明 |
+|------|------|
+| AI 供应商迁移 | DashScope (`dashscope.aliyuncs.com`) → Dify (`api.dify.ai/v1/chat-messages`) |
+| 模型升级 | `qwen-plus` → `qwen3.6-plus`（由 Dify 工作流配置管理） |
+| 请求格式统一 | Web/Tauri/Proxy → `{ query }` → Dify `{ query, conversation_id, inputs, response_mode: 'blocking' }` |
+| 环境变量命名 | `DASHSCOPE_API_KEY` → `DIFY_API_KEY` + `DIFY_BASE_URL` |
+
+### 📝 文档与环境变量
+
+| 文件 | 变更 |
+|------|------|
+| `.env.local` | 新变量名模板 |
+| `.env.production.example` | 新增运行时环境变量说明 |
+| `cloudflare-worker/.env.example` / `.dev.vars.example` | 更新为新变量名 |
+| `.github/workflows/tauri.yml` | 添加 `DIFY_API_KEY` / `DIFY_BASE_URL` 从 secrets 注入 |
+| `README.md` | 更新 API Key 获取指引 |
+
+### 🔗 GitHub 推送
+
+```
+feat: 迁移 AI 智能拆解到 Dify 平台，移除硬编码 API Key
+```

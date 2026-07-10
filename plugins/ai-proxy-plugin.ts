@@ -2,12 +2,6 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import type { Plugin } from 'vite';
 
-interface DashScopeResponse {
-  output?: { choices?: Array<{ message: { content: string } }> | []; text?: string };
-  code?: string;
-  message?: string;
-}
-
 // —— 加载 .env / .env.local（开发环境取 AI Key）——
 function loadEnvFile(name: string): Record<string, string> {
   const p = join(process.cwd(), name);
@@ -57,7 +51,7 @@ async function handleAiRequest(
     bodyChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
 
-  let body: { model?: string; messages?: Array<{ role: string; content: string }> };
+  let body: { query?: string; conversation_id?: string };
   try {
     body = JSON.parse(Buffer.concat(bodyChunks).toString());
   } catch {
@@ -66,38 +60,45 @@ async function handleAiRequest(
     return;
   }
 
-  const apiKey = process.env.DASHSCOPE_API_KEY;
+  const apiKey = process.env.DIFY_API_KEY;
+  const baseUrl = process.env.DIFY_BASE_URL || 'https://api.dify.ai';
+
   if (!apiKey) {
-    console.error('\n⚠️  DASHSCOPE_API_KEY 未设置！');
-    console.error('   请运行以下命令后再试：');
-    console.error('   Windows PowerShell: $env:DASHSCOPE_API_KEY="sk-your-key"');
-    console.error('   Git Bash:           export DASHSCOPE_API_KEY="sk-your-key"\n');
+    console.error('\n⚠️  DIFY_API_KEY 未设置！');
+    console.error('   请配置 .env.local 文件中的 DIFY_API_KEY\n');
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'DASHSCOPE_API_KEY not configured in env' }));
+    res.end(JSON.stringify({ error: 'DIFY_API_KEY not configured in env' }));
     return;
   }
 
   try {
-    console.log(`[AI] → ${body.model ?? 'qwen-plus'} (${body.messages?.length ?? 0} messages)`);
+    const query = body.query ?? '';
+    if (!query) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing query parameter' }));
+      return;
+    }
 
-    const dashRes = await fetch(
-      'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'X-DashScope-SSE': 'disable',
-        },
-        body: JSON.stringify({
-          model: body.model ?? 'qwen-plus',
-          input: { messages: body.messages ?? [] },
-          parameters: { incremental_output: false },
-        }),
+    console.log(`[AI] → Dify (${query.slice(0, 30)}...)`);
+
+    // 解析 baseUrl，支持带 https:// 前缀的情况
+    const url = new URL(baseUrl.endsWith('/v1') ? `${baseUrl}/chat-messages` : `${baseUrl}/v1/chat-messages`);
+
+    const dashRes = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-    );
+      body: JSON.stringify({
+        query,
+        conversation_id: body.conversation_id ?? '',
+        inputs: {},
+        response_mode: 'blocking',
+      }),
+    });
 
-    const data = await dashRes.json() as DashScopeResponse;
+    const data = await dashRes.json();
 
     if (data.code) {
       console.error(`[AI] ✗ ${data.code}: ${data.message}`);
@@ -106,8 +107,8 @@ async function handleAiRequest(
       return;
     }
 
-    // 兼容新旧格式：新版本返回 output.text，旧版输出 output.choices[0].message.content
-    const content = data.output?.text ?? data.output?.choices?.[0]?.message?.content ?? '';
+    // Dify chat-messages 同步模式返回顶层 answer 字段
+    const content = data.answer ?? '';
     console.log(`[AI] ✓ ${content.length} chars`);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, content }));

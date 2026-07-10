@@ -1,35 +1,27 @@
 /**
- * Cloudflare Worker — DashScope 代理
+ * Cloudflare Worker — Dify 代理
  *
  * 作用：
- * 1. 隐藏 DASHSCOPE_API_KEY（浏览器无法看到）
+ * 1. 隐藏 DIFY_API_KEY（浏览器无法看到）
  * 2. 统一 CORS 响应头，避免前端跨域被拦截
  * 3. 防止 Key 泄露后被滥用——可限制 origin、添加消费监控
  *
  * Key 配置方式（三选一）：
- * - 开发：在 .dev.vars 中写 DASHSCOPE_API_KEY=sk-xxx
- * - 部署时传参：wrangler deploy --var DASHSCOPE_API_KEY:sk-xxx
+ * - 开发：在 .dev.vars 中写 DIFY_API_KEY=xxx
+ * - 部署时传参：wrangler deploy --var DIFY_API_KEY:xxx
  * - Cloudflare 控制台 → Worker → Variables and Secrets
  */
 
 interface RequestBody {
-  model?: string;
-  input?: Record<string, unknown>;
-  messages?: Array<{ role: string; content: string }>;
-}
-
-interface ChatChoice {
-  message: { role: string; content: string };
-}
-
-interface ApiResponse {
-  output?: { choices?: ChatChoice[]; text?: string };
-  code?: string;
-  message?: string;
+  query?: string;
+  conversation_id?: string;
 }
 
 export default {
-  async fetch(request: Request, env: { DASHSCOPE_API_KEY: string }): Promise<Response> {
+  async fetch(request: Request, env: {
+    DIFY_API_KEY: string;
+    DIFY_BASE_URL?: string;
+  }): Promise<Response> {
     const url = new URL(request.url);
     console.log(`[${new Date().toISOString()}] ${request.method} ${url.pathname}`);
 
@@ -54,9 +46,11 @@ export default {
       });
     }
 
-    const apiKey = env.DASHSCOPE_API_KEY;
+    const apiKey = env.DIFY_API_KEY;
+    const baseUrl = env.DIFY_BASE_URL || 'https://api.dify.ai';
+
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'DASHSCOPE_API_KEY not configured' }), {
+      return new Response(JSON.stringify({ error: 'DIFY_API_KEY not configured' }), {
         status: 500,
         headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
       });
@@ -72,24 +66,34 @@ export default {
       });
     }
 
-    const { model = 'qwen-plus', messages } = body;
+    const query = body.query ?? '';
+    if (!query) {
+      return new Response(
+        JSON.stringify({ error: 'Missing query parameter' }),
+        { status: 400, headers: { ...corsHeaders(url), 'Content-Type': 'application/json' } },
+      );
+    }
+
+    const targetUrl = new URL(
+      baseUrl.endsWith('/v1') ? `${baseUrl}/chat-messages` : `${baseUrl}/v1/chat-messages`,
+    );
 
     try {
-      const res = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
+      const res = await fetch(targetUrl.toString(), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'X-DashScope-SSE': 'disable',
         },
         body: JSON.stringify({
-          model,
-          input: { messages },
-          parameters: { incremental_output: false },
+          query,
+          conversation_id: body.conversation_id ?? '',
+          inputs: {},
+          response_mode: 'blocking',
         }),
       });
 
-      const data: ApiResponse = await res.json() as ApiResponse;
+      const data = await res.json();
 
       // 统一错误格式
       if (data.code) {
@@ -99,8 +103,8 @@ export default {
         );
       }
 
-      // 兼容新旧格式：新版本返回 output.text，旧版输出 output.choices[0].message.content
-      const content = data.output?.text ?? data.output?.choices?.[0]?.message?.content ?? '';
+      // Dify chat-messages 同步模式返回顶层 answer 字段
+      const content = data.answer ?? '';
 
       return new Response(
         JSON.stringify({ success: true, content }),
