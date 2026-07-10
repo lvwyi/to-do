@@ -1,0 +1,12 @@
+{
+	"version": 1,
+	"description": "Cloudflare Pages routing config",
+	"fallback": { "file": "/index.html" },
+	"rules": [
+		{
+			"glob": "/api/*",
+			"pattern": "*",
+			"serving_data": { "source": "functions" }
+		}
+	]
+}
