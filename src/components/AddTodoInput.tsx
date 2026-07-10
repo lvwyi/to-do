@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTodoApp } from '../hooks/useAppState';
-import { callAi, type AiMessage } from '../utils/aiApi';
+import { callBreakdownAi } from '../utils/aiApi';
 
 interface SubTask {
   text: string;
@@ -30,21 +30,7 @@ export default function AddTodoInput() {
 
     setAiLoading(true);
     try {
-      const messages: AiMessage[] = [
-        {
-          role: 'user',
-          content: trimmed,
-        },
-      ];
-
-      const raw = await callAi({ messages });
-      let jsonStr = raw.trim();
-
-      // 清理 LLM 可能包裹的 markdown 代码块标记
-      const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
-
-      const tasks: SubTask[] = JSON.parse(jsonStr);
+      const tasks = await callBreakdownAi(trimmed);
 
       if (!Array.isArray(tasks) || tasks.length === 0) {
         showToast('AI 返回格式异常，已作为单条待办保存');

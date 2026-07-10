@@ -101,3 +101,49 @@ commit 4054579 fix: remove duplicate text/html from gzip_types
 ```
 feat: 迁移 AI 智能拆解到 Dify 平台，移除硬编码 API Key
 ```
+
+---
+
+## v1.4 — 双工作流路由 & Dify Cloud 集成
+
+**日期：** 2026-07-11
+
+### ✨ 核心变更
+
+| 组件 | 变更 |
+|------|------|
+| `src/utils/aiApi.ts` | 重写：统一 `/api/ai` 端点，支持 `breakdown` + `meeting` 双路由 |
+| `src/components/AddTodoInput.tsx` | 简化：移除冗余的 system prompt（已固化在 Dify 工作流中），使用 `callBreakdownAi()` |
+| `src/components/MeetingPanel.tsx` | 改为调用 Dify Cloud API（替换原来的 `parseMeeting` 正则解析） |
+| `plugins/ai-proxy-plugin.ts` | 新增：根据 `body.type` 自动选择 API Key 和输入变量名 |
+| `proxy-server.js` | 新增：Node.js 生产代理支持双工作流路由 |
+| `cloudflare-worker/src/index.ts` | 更新：Cloudflare Worker 支持 `breakdown` / `meeting` 类型路由 |
+| `src-tauri/src/main.rs` | 更新：Tauri IPC 命令支持 `workflow_type` 字段路由 |
+
+### 🔧 架构升级
+
+| 变更 | 说明 |
+|------|------|
+| AI 供应商 | 全部切换至 Dify Cloud (`https://api.dify.ai`) |
+| 环境变量 | `DIFY_API_KEY` → `DIFY_API_KEY_BREAKDOWN` + `DIFY_API_KEY_MEETING` |
+| 请求格式 | `{ type: 'breakdown'|'meeting', query: '...' }` → 代理层自动路由 |
+| 输入变量 | breakdown: `{ inputs: { string } }`, meeting: `{ inputs: { raw_text } }` |
+
+### 🗑️ 删除
+
+| 文件 | 原因 |
+|------|------|
+| `src/utils/meetingParser.ts` | 被 Dify Cloud API 替代，不再需要纯前端正则解析 |
+
+### 📦 Docker 部署
+
+| 项目 | 镜像 | 端口 |
+|------|------|------|
+| todo-app | `ghcr.io/YOUR_USERNAME/todo-app:latest` | Nginx :80, Proxy :3000 |
+
+```bash
+docker run -d -p 80:80 \
+  -e DIFY_API_KEY_BREAKDOWN="app-xxx" \
+  -e DIFY_API_KEY_MEETING="app-xxx" \
+  ghcr.io/YOUR_USERNAME/todo-app:latest
+```

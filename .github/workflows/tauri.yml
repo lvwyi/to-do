@@ -33,7 +33,8 @@ jobs:
 
       - name: Set up environment
         run: |
-          echo "DIFY_API_KEY=${{ secrets.DIFY_API_KEY }}" >> $GITHUB_ENV
+          echo "DIFY_API_KEY_BREAKDOWN=${{ secrets.DIFY_API_KEY_BREAKDOWN }}" >> $GITHUB_ENV
+          echo "DIFY_API_KEY_MEETING=${{ secrets.DIFY_API_KEY_MEETING }}" >> $GITHUB_ENV
           echo "DIFY_BASE_URL=${{ secrets.DIFY_BASE_URL || 'https://api.dify.ai' }}" >> $GITHUB_ENV
 
       - name: Install frontend deps

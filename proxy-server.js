@@ -1,8 +1,8 @@
 /**
- * AI 反向代理 —— Dify 平台版（Node.js）
+ * AI 反向代理 —— Dify Cloud 平台版（Node.js）
  *
- * 用途：在国内服务器上运行，供 Nginx 反向代理转发 AI 请求
- * 不暴露 API Key，支持 CORS
+ * 用途：在 Docker 容器内与 Nginx 并行运行，监听端口 3000
+ * 支持两个工作流路由：breakdown（智能拆解）/ meeting（会议助手）
  */
 const http = require('node:http');
 const https = require('node:https');
@@ -11,7 +11,8 @@ const { parse } = require('node:url');
 
 // —— 从环境变量或 .env 文件加载配置 ——
 const DOTENV_PATH = require('path').join(__dirname, '.env');
-let apiKey = '';
+let apiKeyBreakdown = '';
+let apiKeyMeeting = '';
 let baseUrl = 'https://api.dify.ai';
 try {
   const fs = require('fs');
@@ -21,21 +22,18 @@ try {
     if (!trimmed || trimmed.startsWith('#')) continue;
     const [key, ...rest] = trimmed.split('=');
     const value = rest.join('=').trim();
-    if (key.trim() === 'DIFY_API_KEY') {
-      apiKey = value;
-    }
-    if (key.trim() === 'DIFY_BASE_URL') {
-      baseUrl = value;
-    }
+    if (key.trim() === 'DIFY_API_KEY_BREAKDOWN') apiKeyBreakdown = value;
+    if (key.trim() === 'DIFY_API_KEY_MEETING') apiKeyMeeting = value;
+    if (key.trim() === 'DIFY_BASE_URL') baseUrl = value;
   }
 } catch {}
 
-apiKey = process.env.DIFY_API_KEY || apiKey;
-baseUrl = process.env.DIFY_BASE_URL || baseUrl;
+apiKeyBreakdown = process.env.DIFY_API_KEY_BREAKDOWN || apiKeyBreakdown;
+apiKeyMeeting   = process.env.DIFY_API_KEY_MEETING || apiKeyMeeting;
+baseUrl         = process.env.DIFY_BASE_URL || baseUrl;
 
-if (!apiKey) {
-  console.error('⚠️  DIFY_API_KEY 未设置！');
-  console.error('   请配置 .env 文件或设置环境变量 DIFY_API_KEY');
+if (!apiKeyBreakdown && !apiKeyMeeting) {
+  console.error('⚠️  DIFY_API_KEY_BREAKDOWN 和 DIFY_API_KEY_MEETING 至少需要一个！');
   process.exit(1);
 }
 
@@ -66,6 +64,7 @@ const server = createServer(async (req, res) => {
     }
     const body = JSON.parse(Buffer.concat(chunks).toString());
 
+    const type = body.type ?? 'breakdown';
     const query = body.query ?? '';
     if (!query) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -73,12 +72,25 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    const targetUrl = new URL(baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`);
+    // 根据 type 选择 API Key
+    const apiKey = type === 'meeting' ? apiKeyMeeting : apiKeyBreakdown;
+    if (!apiKey) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: `${type} API Key not configured` }));
+      return;
+    }
+
+    // 根据 type 选择输入变量名
+    const inputVarName = type === 'meeting' ? 'raw_text' : 'string';
+
+    const targetUrl = new URL(
+      baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`,
+    );
     const isHttps = targetUrl.protocol === 'https:';
     const client = isHttps ? https : http;
 
     const payload = JSON.stringify({
-      inputs: { string: query },
+      inputs: { [inputVarName]: query },
       response_mode: 'blocking',
       user: 'todo-app-client',
     });
@@ -101,14 +113,21 @@ const server = createServer(async (req, res) => {
       proxyReq.end();
     });
 
-    // 读取响应
     const respChunks = [];
     for await (const chunk of apiRes) {
       respChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     const respData = JSON.parse(Buffer.concat(respChunks).toString());
 
-    // Dify workflow 同步模式返回 data.outputs.out
+    if (respData.code) {
+      res.writeHead(apiRes.statusCode || 400, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(JSON.stringify({ error: `${respData.code}: ${respData.message}` }));
+      return;
+    }
+
     const content = respData.data?.outputs?.out ?? '';
 
     res.writeHead(200, {

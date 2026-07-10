@@ -1,33 +1,27 @@
 /**
- * Cloudflare Worker — Dify 代理
+ * Cloudflare Worker — Dify 代理（双工作流路由）
  *
  * 作用：
  * 1. 隐藏 DIFY_API_KEY（浏览器无法看到）
  * 2. 统一 CORS 响应头，避免前端跨域被拦截
- * 3. 防止 Key 泄露后被滥用——可限制 origin、添加消费监控
- *
- * Key 配置方式（三选一）：
- * - 开发：在 .dev.vars 中写 DIFY_API_KEY=xxx
- * - 部署时传参：wrangler deploy --var DIFY_API_KEY:xxx
- * - Cloudflare 控制台 → Worker → Variables and Secrets
+ * 3. 支持两个工作流：breakdown（智能拆解）/ meeting（会议助手）
  */
 
 interface RequestBody {
+  type?: string;
   query?: string;
-  conversation_id?: string;
 }
 
 export default {
   async fetch(request: Request, env: {
-    DIFY_API_KEY: string;
+    DIFY_API_KEY_BREAKDOWN?: string;
+    DIFY_API_KEY_MEETING?: string;
     DIFY_BASE_URL?: string;
   }): Promise<Response> {
     const url = new URL(request.url);
-    console.log(`[${new Date().toISOString()}] ${request.method} ${url.pathname}`);
 
     // —— OPTIONS preflight ——
     if (request.method === 'OPTIONS') {
-      console.log('[preflight] allowing request');
       return new Response(null, { status: 204, headers: corsHeaders(url) });
     }
 
@@ -46,16 +40,6 @@ export default {
       });
     }
 
-    const apiKey = env.DIFY_API_KEY;
-    const baseUrl = env.DIFY_BASE_URL || 'https://api.dify.ai';
-
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'DIFY_API_KEY not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
-      });
-    }
-
     let body: RequestBody;
     try {
       body = await request.json();
@@ -66,13 +50,27 @@ export default {
       });
     }
 
+    const type = body.type ?? 'breakdown';
     const query = body.query ?? '';
+
     if (!query) {
-      return new Response(
-        JSON.stringify({ error: 'Missing query parameter' }),
-        { status: 400, headers: { ...corsHeaders(url), 'Content-Type': 'application/json' } },
-      );
+      return new Response(JSON.stringify({ error: 'Missing query parameter' }), {
+        status: 400,
+        headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
+      });
     }
+
+    // 根据 type 选择 API Key
+    const apiKey = type === 'meeting' ? env.DIFY_API_KEY_MEETING : env.DIFY_API_KEY_BREAKDOWN;
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: `${type} API Key not configured` }), {
+        status: 500,
+        headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
+      });
+    }
+
+    const baseUrl = env.DIFY_BASE_URL || 'https://api.dify.ai';
+    const inputVarName = type === 'meeting' ? 'raw_text' : 'string';
 
     const targetUrl = new URL(
       baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`,
@@ -86,7 +84,7 @@ export default {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          inputs: { string: query },
+          inputs: { [inputVarName]: query },
           response_mode: 'blocking',
           user: 'todo-app-client',
         }),
@@ -94,27 +92,24 @@ export default {
 
       const data = await res.json();
 
-      // 统一错误格式
       if (data.detail?.error) {
-        return new Response(
-          JSON.stringify({ error: data.detail.error }),
-          { status: 400, headers: { ...corsHeaders(url), 'Content-Type': 'application/json' } },
-        );
+        return new Response(JSON.stringify({ error: data.detail.error }), {
+          status: 400,
+          headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
+        });
       }
       if (data.code) {
-        return new Response(
-          JSON.stringify({ error: `${data.code}: ${data.message}` }),
-          { status: res.status, headers: { ...corsHeaders(url), 'Content-Type': 'application/json' } },
-        );
+        return new Response(JSON.stringify({ error: `${data.code}: ${data.message}` }), {
+          status: res.status,
+          headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
+        });
       }
 
-      // Dify workflow 同步模式返回 data.outputs.out
       const content = data.data?.outputs?.out ?? '';
-
-      return new Response(
-        JSON.stringify({ success: true, content }),
-        { status: 200, headers: { ...corsHeaders(url), 'Content-Type': 'application/json' } },
-      );
+      return new Response(JSON.stringify({ success: true, content }), {
+        status: 200,
+        headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
+      });
     } catch (err: unknown) {
       return new Response(
         JSON.stringify({ error: err instanceof Error ? err.message : 'Upstream request failed' }),
@@ -130,7 +125,6 @@ function corsHeaders(origin: URL): HeadersInit {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Content-Type': 'application/json',
-    // 缓存预检请求结果，减少 preflight 频率
     'Access-Control-Max-Age': '86400',
   };
 }

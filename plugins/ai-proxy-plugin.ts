@@ -36,7 +36,6 @@ export function aiProxyPlugin(): Plugin {
     name: 'todo-ai-proxy',
 
     configureServer(server) {
-      // 在 Vite 的内部中间件栈中插入我们的处理器
       server.middlewares.use(async (req, res, next) => {
         if (req.url?.startsWith('/api/') && req.method === 'POST') {
           await handleAiRequest(req, res);
@@ -52,81 +51,91 @@ async function handleAiRequest(
   req: import('http').IncomingMessage,
   res: import('http').ServerResponse,
 ) {
+  // 读取请求体（UTF-8 编码）
   const bodyChunks: Buffer[] = [];
   for await (const chunk of req) {
     bodyChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
+  const rawBody = Buffer.concat(bodyChunks.map(b => Buffer.from(b)));
 
-  let body: { query?: string; conversation_id?: string };
+  let body: { type?: string; query?: string };
   try {
-    body = JSON.parse(Buffer.concat(bodyChunks).toString());
+    body = JSON.parse(new TextDecoder('utf-8').decode(rawBody));
   } catch {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Invalid JSON' }));
     return;
   }
 
-  const apiKey = process.env.DIFY_API_KEY;
+  const apiKey = process.env.DIFY_API_KEY_BREAKDOWN || process.env.DIFY_API_KEY || '';
+  const apiKeyMeeting = process.env.DIFY_API_KEY_MEETING || '';
   const baseUrl = process.env.DIFY_BASE_URL || 'https://api.dify.ai';
 
-  if (!apiKey) {
-    console.error('\n⚠️  DIFY_API_KEY 未设置！');
-    console.error('   请配置 .env.local 文件中的 DIFY_API_KEY\n');
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'DIFY_API_KEY not configured in env' }));
+  const type = body.type ?? 'breakdown';
+  const query = body.query ?? '';
+
+  if (!query) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Missing query parameter' }));
     return;
   }
 
-  try {
-    const query = body.query ?? '';
-    if (!query) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing query parameter' }));
-      return;
-    }
-
-    console.log(`[AI] → Dify workflow (${query.slice(0, 30)}...)`);
-
-    // Workflow 应用使用 /v1/workflows/run 端点
-    const url = new URL(baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`);
-
-    const dashRes = await fetch(url.toString(), {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        inputs: { string: query },
-        response_mode: 'blocking',
-        user: 'todo-app-client',
-      }),
-    });
-
-    const data = await dashRes.json() as DifyResponse;
-
-    if (data.detail?.error) {
-      console.error(`[AI] ✗ ${data.detail.error}`);
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: data.detail.error }));
-      return;
-    }
-    if (data.code) {
-      console.error(`[AI] ✗ ${data.code}: ${data.message}`);
-      res.writeHead(dashRes.status, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: `${data.code}: ${data.message}` }));
-      return;
-    }
-
-    // Dify workflow 同步模式返回 data.outputs.out
-    const content = data.data?.outputs?.out ?? '';
-    console.log(`[AI] ✓ ${content.length} chars`);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true, content }));
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[AI] ✗ ${msg}`);
-    res.writeHead(502, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: msg }));
+  // 根据 type 选择 API Key
+  const effectiveKey = type === 'meeting' ? apiKeyMeeting : apiKey;
+  if (!effectiveKey) {
+    console.error(`[AI] ✗ ${type} API Key not configured`);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: `${type} API Key not configured in env` }));
+    return;
   }
+
+  // 根据 type 选择输入变量名
+  const inputVarName = type === 'meeting' ? 'raw_text' : 'string';
+
+  console.log(`[AI] → Dify workflow (${type}) (${query.slice(0, 30)}...)`);
+
+  // Workflow 端点
+  const urlStr = baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`;
+
+  const dashRes = await fetch(urlStr, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${effectiveKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      inputs: { [inputVarName]: query },
+      response_mode: 'blocking',
+      user: 'todo-app-client',
+    }),
+  });
+
+  const rawText = await dashRes.text();
+
+  let data: DifyResponse;
+  try {
+    data = JSON.parse(rawText) as DifyResponse;
+  } catch {
+    res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to parse Dify response' }));
+    return;
+  }
+
+  if (dashRes.status >= 400) {
+    console.error(`[AI] ✗ HTTP ${dashRes.status}`);
+    res.writeHead(dashRes.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: `Dify returned ${dashRes.status}` }));
+    return;
+  }
+  if (data.code) {
+    console.error(`[AI] ✗ ${data.code}: ${data.message}`);
+    res.writeHead(dashRes.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: `${data.code}: ${data.message}` }));
+    return;
+  }
+
+  const content = data.data?.outputs?.out ?? '';
+  console.log(`[AI] ✓ ${type} - ${content.length} chars`);
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ success: true, content }));
 }

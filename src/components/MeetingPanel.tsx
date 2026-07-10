@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTodoApp } from '../hooks/useAppState';
-import { parseMeeting } from '../utils/meetingParser';
-import type { MeetingResult } from '../utils/meetingParser';
+import { callMeetingAnalysis } from '../utils/aiApi';
+import type { MeetingResult } from '../utils/aiApi';
 import { formatDate, escapeHtml, todayStr } from '../utils/helpers';
 
 export default function MeetingPanel() {
@@ -11,31 +11,30 @@ export default function MeetingPanel() {
   const [processing, setProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState<'input' | 'result'>('input');
 
-  /** Parse meeting text and extract structured info */
-  const handleParse = useCallback(() => {
+  /** Parse meeting text and extract structured info via Dify Cloud */
+  const handleParse = useCallback(async () => {
     const trimmed = input.trim();
     if (!trimmed) return;
+
     setProcessing(true);
-    // Small delay to let UI update before processing
-    requestAnimationFrame(() => {
-      try {
-        const extracted = parseMeeting(trimmed);
-        setResult(extracted);
-        setActiveTab('result');
-      } catch (err) {
-        showToast('解析失败，请检查输入内容');
-        console.error(err);
-      } finally {
-        setProcessing(false);
-      }
-    });
-  }, [input, showToast]);
+    try {
+      const extracted = await callMeetingAnalysis(trimmed);
+      setResult(extracted);
+      setActiveTab('result');
+    } catch {
+      showToast('AI 解析失败，请检查输入内容');
+      console.error('Meeting analysis failed');
+    } finally {
+      setProcessing(false);
+    }
+  }, [input, setResult, showToast]);
 
   /** Add a single task to todos */
-  const addTaskToTodo = useCallback((task: NonNullable<MeetingResult['tasks']>[0]) => {
+  const addTaskToTodo = useCallback((task: NonNullable<NonNullable<MeetingResult>['tasks']>[0]) => {
+    if (!result) return;
     addTodo({
       text: `[会议] ${task.content}`,
-      description: `来源：${result?.info.title}（${result?.info.time}）\n负责人：${task.assignee}`,
+      description: `来源：${result.info.title}（${result.info.time}）\n负责人：${task.assignee}`,
       priority: 'medium',
       category: 'work',
       due: task.due || todayStr(),
@@ -140,7 +139,6 @@ export default function MeetingPanel() {
             </button>
             {decisionCount > 0 && (
               <button className="btn btn-secondary btn-sm" onClick={() => {
-                // Add decisions as todos too
                 result.decisions.forEach(d => {
                   addTodo({
                     text: d.content,
@@ -157,7 +155,6 @@ export default function MeetingPanel() {
               </button>
             )}
             <button className="btn btn-ghost btn-sm" onClick={() => {
-              // Copy cleaned text
               navigator.clipboard.writeText(result.cleanedText).then(() => {
                 showToast('已复制到剪贴板');
               }).catch(() => {
@@ -214,7 +211,7 @@ export default function MeetingPanel() {
                           <span className="task-assignee">👤 {escapeHtml(t.assignee)}</span>
                         )}
                         {t.due && t.due !== todayStr() && (
-                          <span className="task-due">⏰ {formatDate(t.due)}</span>
+                          <span className="task-due">{formatDate(t.due)}</span>
                         )}
                         {t.due === todayStr() && (
                           <span className="task-due task-due-today">⏰ 今天</span>
