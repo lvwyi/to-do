@@ -37,7 +37,7 @@ export default function AddTodoInput() {
         },
       ];
 
-      const raw = await callAi({ model: 'qwen-plus', messages });
+      const raw = await callAi({ messages });
       let jsonStr = raw.trim();
 
       // 清理 LLM 可能包裹的 markdown 代码块标记
