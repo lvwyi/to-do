@@ -2,6 +2,12 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import type { Plugin } from 'vite';
 
+interface DifyResponse {
+  code?: string;
+  message?: string;
+  answer?: string;
+}
+
 // —— 加载 .env / .env.local（开发环境取 AI Key）——
 function loadEnvFile(name: string): Record<string, string> {
   const p = join(process.cwd(), name);
@@ -98,7 +104,7 @@ async function handleAiRequest(
       }),
     });
 
-    const data = await dashRes.json();
+    const data = await dashRes.json() as DifyResponse;
 
     if (data.code) {
       console.error(`[AI] ✗ ${data.code}: ${data.message}`);
