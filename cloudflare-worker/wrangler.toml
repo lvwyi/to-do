@@ -4,5 +4,5 @@ compatibility_date = "2025-01-01"
 
 # ⚠️ API Key 不要写在这里！
 # 开发：复制到 .dev.vars （已 .gitignore）
-# 生产：部署时传参  wrangler deploy --var DASHSCOPE_API_KEY:sk-xxxxx
-#        或在 Cloudflare 控制台 → Worker → Variables and Secrets
+# 生产：在 Cloudflare 控制台 → Worker → Variables and Secrets
+#       设置 DIFY_API_KEY 和 DIFY_BASE_URL

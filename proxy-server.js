@@ -1,5 +1,5 @@
 /**
- * AI 反向代理 —— Dify 平台版
+ * AI 反向代理 —— Dify 平台版（Node.js）
  *
  * 用途：在国内服务器上运行，供 Nginx 反向代理转发 AI 请求
  * 不暴露 API Key，支持 CORS
@@ -84,7 +84,7 @@ const server = createServer(async (req, res) => {
       response_mode: 'blocking',
     });
 
-    const dashscopeRes = await new Promise((resolve, reject) => {
+    const apiRes = await new Promise((resolve, reject) => {
       const options = {
         hostname: targetUrl.hostname,
         path: targetUrl.pathname,
@@ -104,7 +104,7 @@ const server = createServer(async (req, res) => {
 
     // 读取响应
     const respChunks = [];
-    for await (const chunk of dashscopeRes) {
+    for await (const chunk of apiRes) {
       respChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     const respData = JSON.parse(Buffer.concat(respChunks).toString());

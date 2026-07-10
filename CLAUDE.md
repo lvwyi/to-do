@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Chinese-language React 19 + TypeScript 6 todo app with AI-powered task decomposition (DashScope API), categories, filtering/sorting, and localStorage persistence. Uses Vite 8 as the build tool.
+A Chinese-language React 19 + TypeScript 6 todo app with AI-powered task decomposition (Dify 平台), categories, filtering/sorting, and localStorage persistence. Uses Vite 8 as the build tool.
 
 ## Common Commands
 
@@ -86,5 +86,5 @@ src/utils/helpers.ts      → Utility functions (sorting, filtering, formatting)
 
 - **TypeScript**: Strict mode with `verbatimModuleSyntax` (use `import type` for types only) and `erasableSyntaxOnly` (all TS syntax must be erasable at emit). Target: ES2023.
 - **Linting**: oxlint (not ESLint) with React + TypeScript plugins. Config in `.oxlintrc.json`.
-- **Env vars**: `.env.local` is gitignored. DashScope API key goes here (referenced by README but `.env.example` not yet created).
+- **Env vars**: `.env.local` is gitignored. `DIFY_API_KEY` and `DIFY_BASE_URL` go here (set in deployment runtime, not in source code).
 - No path aliases configured — imports use relative paths from each file's location.
