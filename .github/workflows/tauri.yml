@@ -10,8 +10,6 @@ permissions:
 
 jobs:
   build-tauri:
-
-  
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,11 +37,9 @@ jobs:
           echo "DIFY_BASE_URL=${{ secrets.DIFY_BASE_URL || 'https://api.dify.ai' }}" >> $GITHUB_ENV
 
       - name: Install frontend deps
-        working-directory: ./todo-app
         run: npm ci
 
       - name: Tauri build
-        working-directory: ./todo-app
         run: npx tauri build
         timeout-minutes: 60
 
@@ -51,5 +47,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: todosetup
-          path: ./todo-app/src-tauri/target/release/bundle/nsis/*-setup.exe
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
