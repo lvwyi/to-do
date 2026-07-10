@@ -69,7 +69,8 @@ export async function callAi(options: AiCallOptions): Promise<string> {
 
   // Web 模式 → HTTP 请求到 Vite 插件或外部代理
   const baseUrl = import.meta.env.VITE_DIFY_BASE_URL || 'http://127.0.0.1/v1';
-  const res = await fetch(`${baseUrl}/v1/workflows/run`, {
+  const apiUrl = baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`;
+  const res = await fetch(apiUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
