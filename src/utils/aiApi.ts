@@ -27,6 +27,7 @@ interface SubTask {
 interface DifyWorkflowResponse {
   code?: string;
   message?: string;
+  detail?: { error?: string };
   data?: { outputs?: Record<string, string>; status?: number };
 }
 
