@@ -96,6 +96,7 @@ async function handleAiRequest(
 
   // Workflow 端点
   const urlStr = baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`;
+  console.log(`[AI] url=${urlStr} body={inputs:{${inputVarName}:...}} key=${effectiveKey?.slice(0,8)}...`);
 
   const dashRes = await fetch(urlStr, {
     method: 'POST',
@@ -110,7 +111,9 @@ async function handleAiRequest(
     }),
   });
 
+  console.log(`[AI] HTTP status: ${dashRes.status}`);
   const rawText = await dashRes.text();
+  console.log(`[AI] raw preview: ${rawText.slice(0, 300)}`);
 
   let data: DifyResponse;
   try {

@@ -111,13 +111,27 @@ const server = createServer(async (req, res) => {
       proxyReq.on('error', reject);
       proxyReq.write(payload);
       proxyReq.end();
+    }).catch(err => {
+      console.error('[Proxy] Dify fetch failed:', err.message);
+      throw new Error(`Dify API unreachable: ${err.message}`);
     });
 
     const respChunks = [];
     for await (const chunk of apiRes) {
       respChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
-    const respData = JSON.parse(Buffer.concat(respChunks).toString());
+    let respData;
+    try {
+      respData = JSON.parse(Buffer.concat(respChunks).toString());
+    } catch {
+      console.error('[Proxy] Invalid JSON from Dify:', Buffer.concat(respChunks).toString().slice(0, 200));
+      res.writeHead(502, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(JSON.stringify({ error: 'Invalid response from Dify API' }));
+      return;
+    }
 
     if (respData.code) {
       res.writeHead(apiRes.statusCode || 400, {
