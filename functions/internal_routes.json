@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Prevent SPA fallback from intercepting /api/ai requests",
+  "description": "Prevent SPA fallback from intercepting AI API requests",
   "include": ["/*"],
-  "exclude": ["/api/ai"]
+  "exclude": ["/api/ai", "/api/ai/**"]
 }

@@ -16,6 +16,14 @@ interface RequestBody {
 	query?: string;
 }
 
+// —— CORS 响应头 ——
+const CORS = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'POST, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type',
+	'Access-Control-Max-Age': '86400',
+};
+
 // 从环境读取配置
 const env = {
 	DIFY_API_KEY_BREAKDOWN: process.env.DIFY_API_KEY_BREAKDOWN || '',
@@ -53,6 +61,8 @@ export async function onRequestPost({ request, env }: any) {
 		? `${baseUrl}/workflows/run`
 		: `${baseUrl}/v1/workflows/run`;
 
+	console.log(`[AI] → Dify workflow (${type}) target=${targetUrl}`);
+
 	try {
 		const res = await fetch(targetUrl, {
 			method: 'POST',
@@ -82,8 +92,10 @@ export async function onRequestPost({ request, env }: any) {
 		}
 
 		const content = data.data?.outputs?.out ?? '';
+		console.log(`[AI] ✓ ${type} - ${content.length} chars`);
 		return jsonResponse({ success: true, content }, 200, url);
 	} catch (err: unknown) {
+		console.error(`[AI] ✗ upstream failed:`, err);
 		return jsonResponse(
 			{ error: err instanceof Error ? err.message : 'Upstream request failed' },
 			502,
@@ -97,22 +109,13 @@ export async function onRequestOptions({ request }: any) {
 	const url = new URL(request.url);
 	return new Response(null, {
 		status: 204,
-		headers: corsHeaders(url),
+		headers: { ...CORS },
 	});
 }
 
-function jsonResponse(data: Record<string, unknown>, status: number, url: URL): Response {
+function jsonResponse(data: Record<string, unknown>, status: number, _url: URL): Response {
 	return new Response(JSON.stringify(data), {
 		status,
-		headers: { 'Content-Type': 'application/json', ...corsHeaders(url) },
+		headers: { 'Content-Type': 'application/json', ...CORS },
 	});
-}
-
-function corsHeaders(origin: URL): Record<string, string> {
-	return {
-		'Access-Control-Allow-Origin': '*',
-		'Access-Control-Allow-Methods': 'POST, OPTIONS',
-		'Access-Control-Allow-Headers': 'Content-Type',
-		'Access-Control-Max-Age': '86400',
-	};
 }
