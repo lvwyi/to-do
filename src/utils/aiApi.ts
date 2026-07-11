@@ -1,7 +1,6 @@
 /**
  * AI 客户端 —— Dify Cloud 平台版
  * - Web 模式：通过本地代理转发请求，避免 API Key 暴露给浏览器
- * - Tauri 模式：暂未支持（双 Key 场景复杂度高）
  */
 
 const AI_API_ENDPOINT = '/api/ai';
@@ -23,18 +22,11 @@ interface SubTask {
   priority: 'low' | 'medium' | 'high';
 }
 
-/** Dify Workflow 响应格式 — 包含可选的 detail 嵌套对象 */
-interface DifyWorkflowResponse {
-  code?: string;
-  message?: string;
-  detail?: { error?: string };
-  data?: { outputs?: Record<string, string>; status?: number };
-}
-
-/** 从消息列表中取最后一条 user 角色内容的纯文本作为 Dify query */
-function extractQuery(messages: { role: string; content: string }[]): string {
-  const userMsgs = messages.filter(m => m.role === 'user');
-  return userMsgs[userMsgs.length - 1]?.content ?? '';
+/** 代理返回的标准响应格式 */
+interface ProxyResponse {
+  success?: boolean;
+  content?: string;
+  error?: string;
 }
 
 // ---- 共享 fetch 逻辑 ----
@@ -50,43 +42,37 @@ async function callDify(type: 'breakdown' | 'meeting', query: string): Promise<s
     throw new Error(`AI 请求失败 (${res.status})`);
   }
 
-  const data: DifyWorkflowResponse = await res.json();
-  if (data.code) throw new Error(`${data.code}: ${data.message}`);
-  if (data.detail?.error) throw new Error(data.detail.error);
+  const data: ProxyResponse = await res.json();
 
-  const content = data.data?.outputs?.out ?? '';
-  if (!content.trim()) throw new Error('AI 未返回有效内容');
+  // 检查代理层是否有错误
+  if (data.error) throw new Error(data.error);
+  if (!data.success || !data.content) throw new Error('AI 未返回有效内容');
 
-  return content;
+  return data.content;
 }
 
 /** 智能拆解：调用 Dify 工作流，输入查询字符串 */
 export async function callBreakdownAi(query: string): Promise<SubTask[]> {
   const raw = await callDify('breakdown', query);
 
-  // 清理 markdown 代码块标记
+  // 清理 markdown 代码块标记（如 ```json ... ``` 或 ``` ... ```)
   let jsonStr = raw.trim();
   const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
 
-  const tasks = JSON.parse(jsonStr);
-  if (!Array.isArray(tasks)) throw new Error('AI 返回格式异常');
-  return tasks;
+  try {
+    const tasks = JSON.parse(jsonStr);
+    if (!Array.isArray(tasks)) throw new Error('AI 返回格式异常');
+    return tasks;
+  } catch (err) {
+    console.error('[AI Parse Error] Failed to parse task list:', err);
+    console.error('[AI Parse Error] Raw content preview:', jsonStr.slice(0, 300));
+    throw new Error(`AI 返回格式异常（${(err as Error).message}）`);
+  }
 }
 
 /** 会议分析：调用 Dify 工作流，输入会议纪要全文 */
 export async function callMeetingAnalysis(query: string): Promise<MeetingResult> {
   const raw = await callDify('meeting', query);
   return JSON.parse(raw);
-}
-
-/** 兼容旧接口 —— 内部使用（已废弃，优先使用上面两个新函数） */
-interface AiCallOptions {
-  messages: { role: string; content: string }[];
-}
-
-export async function callAi(options: AiCallOptions): Promise<string> {
-  const query = extractQuery(options.messages);
-  if (!query) throw new Error('未找到有效的用户输入内容');
-  return callDify('breakdown', query);
 }
