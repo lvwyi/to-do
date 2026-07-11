@@ -9,22 +9,28 @@ const https = require('node:https');
 const { createServer } = require('node:http');
 const { parse } = require('node:url');
 
-// —— 从环境变量或 .env 文件加载配置 ——
-const DOTENV_PATH = require('path').join(__dirname, '.env');
+// —— 从环境变量或 .env / .env.local 文件加载配置 ——
+const DOTENV_PATHS = [require('path').join(__dirname, '.env.local'), require('path').join(__dirname, '.env')];
 let apiKeyBreakdown = '';
 let apiKeyMeeting = '';
 let baseUrl = 'https://api.dify.ai';
+
 try {
   const fs = require('fs');
-  const raw = fs.readFileSync(DOTENV_PATH, 'utf-8');
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const [key, ...rest] = trimmed.split('=');
-    const value = rest.join('=').trim();
-    if (key.trim() === 'DIFY_API_KEY_BREAKDOWN') apiKeyBreakdown = value;
-    if (key.trim() === 'DIFY_API_KEY_MEETING') apiKeyMeeting = value;
-    if (key.trim() === 'DIFY_BASE_URL') baseUrl = value;
+  // 优先读取 .env.local（包含 API Key），再读 .env（可能只含基础配置）
+  for (const dotenvPath of DOTENV_PATHS) {
+    try {
+      const raw = fs.readFileSync(dotenvPath, 'utf-8');
+      for (const line of raw.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const [key, ...rest] = trimmed.split('=');
+        const value = rest.join('=').trim();
+        if (key.trim() === 'DIFY_API_KEY_BREAKDOWN') apiKeyBreakdown = value;
+        if (key.trim() === 'DIFY_API_KEY_MEETING') apiKeyMeeting = value;
+        if (key.trim() === 'DIFY_BASE_URL') baseUrl = value;
+      }
+    } catch {} // 文件不存在则跳过
   }
 } catch {}
 

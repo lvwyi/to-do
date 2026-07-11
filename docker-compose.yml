@@ -1,0 +1,18 @@
+# Docker Compose for Todo App with AI Proxy
+# Usage: docker compose up -d
+version: '3.8'
+
+services:
+  todo-app:
+    build: .
+    ports:
+      - "80:80"
+      - "3000:3000"
+    environment:
+      # Dify Cloud API Keys (AI 后端)
+      - DIFY_API_KEY_BREAKDOWN=${DIFY_API_KEY_BREAKDOWN}
+      - DIFY_API_KEY_MEETING=${DIFY_API_KEY_MEETING}
+      - DIFY_BASE_URL=${DIFY_BASE_URL:-https://api.dify.ai}
+      # 可选：修改代理端口
+      # - PROXY_PORT=3000
+    restart: unless-stopped

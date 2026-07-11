@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
-      ...((mode === 'development' || mode === 'serve') ? [aiProxyPlugin()] : []), // 仅开发环境启用 AI 代理
+      ...((mode === 'development' || mode === 'serve') ? [aiProxyPlugin()] : []), // 开发环境和 vite preview 启用 AI 代理
     ],
     define: {
       'import.meta.env.VITE_AI_PROXY_URL': JSON.stringify(env.VITE_AI_PROXY_URL ?? '/api'),
