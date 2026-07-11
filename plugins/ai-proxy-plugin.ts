@@ -113,9 +113,9 @@ async function handleAiRequest(
 	const urlStr = baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`;
 	console.log(`[AI] url=${urlStr} key=${effectiveKey.slice(0,8)}...`);
 
-	// CodeNodeData 需要 code_language 变量，meeting 类型自动补充
-	const inputs: Record<string, string> = { [inputVarName]: query };
-	if (type === 'meeting') inputs.code_language = 'python';
+	// Workflow 端点
+	const urlStr = baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`;
+	console.log(`[AI] url=${urlStr} key=${effectiveKey.slice(0,8)}...`);
 
 	try {
 		const dashRes = await fetch(urlStr, {
@@ -123,10 +123,9 @@ async function handleAiRequest(
 			headers: {
 				Authorization: `Bearer ${effectiveKey}`,
 				'Content-Type': 'application/json',
-				'User-Agent': 'todo-app/1.0',
 			},
 			body: JSON.stringify({
-				inputs,
+				inputs: { [inputVarName]: query },
 				response_mode: 'blocking',
 				user: 'todo-app-client',
 			}),

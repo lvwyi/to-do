@@ -95,11 +95,8 @@ const server = createServer(async (req, res) => {
     const isHttps = targetUrl.protocol === 'https:';
     const client = isHttps ? https : http;
 
-    const inputs = { [inputVarName]: query };
-    if (type === 'meeting') inputs.code_language = 'python';
-
     const payload = JSON.stringify({
-      inputs,
+      inputs: { [inputVarName]: query },
       response_mode: 'blocking',
       user: 'todo-app-client',
     });
@@ -115,7 +112,6 @@ const server = createServer(async (req, res) => {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payload),
-          'User-Agent': 'todo-app/1.0',
         },
       };
       if (targetUrl.port) options.port = parseInt(targetUrl.port, 10);
