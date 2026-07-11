@@ -4,7 +4,7 @@
  * - Tauri 模式：暂未支持（双 Key 场景复杂度高）
  */
 
-const PROXY = import.meta.env.VITE_AI_PROXY_URL ?? '/api';
+const AI_API_ENDPOINT = '/api/ai';
 
 /** 会议分析返回结果类型 */
 export interface MeetingResult {
@@ -23,7 +23,7 @@ interface SubTask {
   priority: 'low' | 'medium' | 'high';
 }
 
-/** Dify Workflow 响应格式 */
+/** Dify Workflow 响应格式 — 包含可选的 detail 嵌套对象 */
 interface DifyWorkflowResponse {
   code?: string;
   message?: string;
@@ -40,7 +40,7 @@ function extractQuery(messages: { role: string; content: string }[]): string {
 // ---- 共享 fetch 逻辑 ----
 
 async function callDify(type: 'breakdown' | 'meeting', query: string): Promise<string> {
-  const res = await fetch(`${PROXY}/ai`, {
+  const res = await fetch(`${AI_API_ENDPOINT}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type, query }),

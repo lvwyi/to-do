@@ -5,6 +5,7 @@ import type { Plugin } from 'vite';
 interface DifyResponse {
   code?: string;
   message?: string;
+  detail?: { error?: string };
   data?: { outputs?: Record<string, string>; status?: number };
 }
 
