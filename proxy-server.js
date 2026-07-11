@@ -96,13 +96,15 @@ const server = createServer(async (req, res) => {
     const client = isHttps ? https : http;
 
     const inputs = { [inputVarName]: query };
-    if (type === 'meeting') inputs.code_language = 'zh-CN';
+    if (type === 'meeting') inputs.code_language = 'python';
 
     const payload = JSON.stringify({
       inputs,
       response_mode: 'blocking',
       user: 'todo-app-client',
     });
+
+    console.log(`[Proxy] → Dify (${type}) url=${targetUrl.pathname}`);
 
     const apiRes = await new Promise((resolve, reject) => {
       const options = {
@@ -113,6 +115,7 @@ const server = createServer(async (req, res) => {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payload),
+          'User-Agent': 'todo-app/1.0',
         },
       };
       if (targetUrl.port) options.port = parseInt(targetUrl.port, 10);
@@ -121,7 +124,7 @@ const server = createServer(async (req, res) => {
       proxyReq.write(payload);
       proxyReq.end();
     }).catch(err => {
-      console.error('[Proxy] Dify fetch failed:', err.message);
+      console.error('[Proxy] ✗ fetch failed:', err.message);
       throw new Error(`Dify API unreachable: ${err.message}`);
     });
 
@@ -129,11 +132,27 @@ const server = createServer(async (req, res) => {
     for await (const chunk of apiRes) {
       respChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
+    let rawText;
+    try {
+      rawText = Buffer.concat(respChunks).toString();
+    } catch {
+      console.error('[Proxy] Failed to read response');
+      res.writeHead(502, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(JSON.stringify({ error: 'Failed to read response from Dify' }));
+      return;
+    }
+
+    console.log(`[Proxy] HTTP status: ${apiRes.statusCode}`);
+    console.log(`[Proxy] raw preview: ${rawText.slice(0, 300)}`);
+
     let respData;
     try {
-      respData = JSON.parse(Buffer.concat(respChunks).toString());
+      respData = JSON.parse(rawText);
     } catch {
-      console.error('[Proxy] Invalid JSON from Dify:', Buffer.concat(respChunks).toString().slice(0, 200));
+      console.error('[Proxy] Invalid JSON:', rawText.slice(0, 200));
       res.writeHead(502, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',

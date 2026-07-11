@@ -65,13 +65,14 @@ export async function onRequestPost({ request, env }: any) {
 
 	try {
 		const inputs: Record<string, string> = { [inputVarName]: query };
-		if (type === 'meeting') inputs.code_language = 'zh-CN';
+		if (type === 'meeting') inputs.code_language = 'python';
 
 		const res = await fetch(targetUrl, {
 			method: 'POST',
 			headers: {
 				Authorization: `Bearer ${apiKey}`,
 				'Content-Type': 'application/json',
+				'User-Agent': 'todo-app/1.0',
 			},
 			body: JSON.stringify({
 				inputs,
@@ -80,13 +81,24 @@ export async function onRequestPost({ request, env }: any) {
 			}),
 		});
 
-		const data = await res.json();
+		const rawText = await res.text();
+		console.log(`[AI] HTTP status: ${res.status}`);
+		console.log(`[AI] raw preview: ${rawText.slice(0, 300)}`);
+
+		let data;
+		try {
+			data = JSON.parse(rawText);
+		} catch {
+			console.error('[AI] ✗ Failed to parse response:', rawText.slice(0, 200));
+			return jsonResponse({ error: 'Failed to parse Dify response' }, 502, url);
+		}
 
 		// Dify 错误处理
 		if (data.detail?.error) {
 			return jsonResponse({ error: data.detail.error }, 400, url);
 		}
 		if (data.code) {
+			console.error(`[AI] ✗ ${data.code}: ${data.message}`);
 			return jsonResponse(
 				{ error: `${data.code}: ${data.message}` },
 				res.status,
@@ -98,7 +110,7 @@ export async function onRequestPost({ request, env }: any) {
 		console.log(`[AI] ✓ ${type} - ${content.length} chars`);
 		return jsonResponse({ success: true, content }, 200, url);
 	} catch (err: unknown) {
-		console.error(`[AI] ✗ upstream failed:`, err);
+		console.error(`[AI] ✗ upstream failed:`, err instanceof Error ? err.message : String(err));
 		return jsonResponse(
 			{ error: err instanceof Error ? err.message : 'Upstream request failed' },
 			502,
@@ -109,7 +121,7 @@ export async function onRequestPost({ request, env }: any) {
 
 // OPTIONS preflight for CORS
 export async function onRequestOptions({ request }: any) {
-	const url = new URL(request.url);
+	const _url = new URL(request.url);
 	return new Response(null, {
 		status: 204,
 		headers: { ...CORS },

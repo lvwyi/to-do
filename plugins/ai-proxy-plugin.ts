@@ -115,7 +115,7 @@ async function handleAiRequest(
 
 	// CodeNodeData 需要 code_language 变量，meeting 类型自动补充
 	const inputs: Record<string, string> = { [inputVarName]: query };
-	if (type === 'meeting') inputs.code_language = 'zh-CN';
+	if (type === 'meeting') inputs.code_language = 'python';
 
 	try {
 		const dashRes = await fetch(urlStr, {
@@ -123,6 +123,7 @@ async function handleAiRequest(
 			headers: {
 				Authorization: `Bearer ${effectiveKey}`,
 				'Content-Type': 'application/json',
+				'User-Agent': 'todo-app/1.0',
 			},
 			body: JSON.stringify({
 				inputs,
@@ -139,14 +140,14 @@ async function handleAiRequest(
 		try {
 			data = JSON.parse(rawText) as DifyResponse;
 		} catch {
-			console.error('[AI] ✗ Failed to parse Dify response');
+			console.error('[AI] ✗ Failed to parse Dify response:', rawText.slice(0, 200));
 			res.writeHead(502, { 'Content-Type': 'application/json', ...CORS_HEADERS });
-			res.end(JSON.stringify({ error: 'Failed to parse Dify response' }));
+			res.end(JSON.stringify({ error: 'Failed to parse Dify response (received unexpected format)' }));
 			return;
 		}
 
 		if (dashRes.status >= 400) {
-			console.error(`[AI] ✗ HTTP ${dashRes.status}`);
+			console.error(`[AI] ✗ HTTP ${dashRes.status}: ${JSON.stringify(data).slice(0, 200)}`);
 			res.writeHead(dashRes.status, { 'Content-Type': 'application/json', ...CORS_HEADERS });
 			res.end(JSON.stringify({ error: `Dify returned ${dashRes.status}` }));
 			return;
@@ -164,7 +165,6 @@ async function handleAiRequest(
 		res.end(JSON.stringify({ success: true, content }));
 	} catch (err: unknown) {
 		console.error(`[AI] ✗ fetch failed:`, err instanceof Error ? err.message : String(err));
-		// 确保 res 没有被发送到客户端
 		if (!res.writableEnded) {
 			res.writeHead(502, { 'Content-Type': 'application/json', ...CORS_HEADERS });
 			res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Upstream request failed' }));
