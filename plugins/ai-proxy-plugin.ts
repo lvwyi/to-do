@@ -113,6 +113,10 @@ async function handleAiRequest(
 	const urlStr = baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`;
 	console.log(`[AI] url=${urlStr} key=${effectiveKey.slice(0,8)}...`);
 
+	// CodeNodeData 需要 code_language 变量，meeting 类型自动补充
+	const inputs: Record<string, string> = { [inputVarName]: query };
+	if (type === 'meeting') inputs.code_language = 'zh-CN';
+
 	const dashRes = await fetch(urlStr, {
 		method: 'POST',
 		headers: {
@@ -120,7 +124,7 @@ async function handleAiRequest(
 			'Content-Type': 'application/json',
 		},
 		body: JSON.stringify({
-			inputs: { [inputVarName]: query },
+			inputs,
 			response_mode: 'blocking',
 			user: 'todo-app-client',
 		}),

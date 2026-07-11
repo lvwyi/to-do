@@ -64,6 +64,9 @@ export async function onRequestPost({ request, env }: any) {
 	console.log(`[AI] → Dify workflow (${type}) target=${targetUrl}`);
 
 	try {
+		const inputs: Record<string, string> = { [inputVarName]: query };
+		if (type === 'meeting') inputs.code_language = 'zh-CN';
+
 		const res = await fetch(targetUrl, {
 			method: 'POST',
 			headers: {
@@ -71,7 +74,7 @@ export async function onRequestPost({ request, env }: any) {
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify({
-				inputs: { [inputVarName]: query },
+				inputs,
 				response_mode: 'blocking',
 				user: 'todo-app-client',
 			}),

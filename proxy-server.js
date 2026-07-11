@@ -95,8 +95,11 @@ const server = createServer(async (req, res) => {
     const isHttps = targetUrl.protocol === 'https:';
     const client = isHttps ? https : http;
 
+    const inputs = { [inputVarName]: query };
+    if (type === 'meeting') inputs.code_language = 'zh-CN';
+
     const payload = JSON.stringify({
-      inputs: { [inputVarName]: query },
+      inputs,
       response_mode: 'blocking',
       user: 'todo-app-client',
     });
