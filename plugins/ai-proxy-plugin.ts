@@ -113,10 +113,6 @@ async function handleAiRequest(
 	const urlStr = baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`;
 	console.log(`[AI] url=${urlStr} key=${effectiveKey.slice(0,8)}...`);
 
-	// Workflow 端点
-	const urlStr = baseUrl.endsWith('/v1') ? `${baseUrl}/workflows/run` : `${baseUrl}/v1/workflows/run`;
-	console.log(`[AI] url=${urlStr} key=${effectiveKey.slice(0,8)}...`);
-
 	try {
 		const dashRes = await fetch(urlStr, {
 			method: 'POST',
