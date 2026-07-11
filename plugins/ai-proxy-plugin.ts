@@ -117,48 +117,57 @@ async function handleAiRequest(
 	const inputs: Record<string, string> = { [inputVarName]: query };
 	if (type === 'meeting') inputs.code_language = 'zh-CN';
 
-	const dashRes = await fetch(urlStr, {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${effectiveKey}`,
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify({
-			inputs,
-			response_mode: 'blocking',
-			user: 'todo-app-client',
-		}),
-	});
-
-	console.log(`[AI] HTTP status: ${dashRes.status}`);
-	const rawText = await dashRes.text();
-	console.log(`[AI] raw preview: ${rawText.slice(0, 300)}`);
-
-	let data: DifyResponse;
 	try {
-		data = JSON.parse(rawText) as DifyResponse;
-	} catch {
-		console.error('[AI] ✗ Failed to parse Dify response');
-		res.writeHead(502, { 'Content-Type': 'application/json', ...CORS_HEADERS });
-		res.end(JSON.stringify({ error: 'Failed to parse Dify response' }));
-		return;
-	}
+		const dashRes = await fetch(urlStr, {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${effectiveKey}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				inputs,
+				response_mode: 'blocking',
+				user: 'todo-app-client',
+			}),
+		});
 
-	if (dashRes.status >= 400) {
-		console.error(`[AI] ✗ HTTP ${dashRes.status}`);
-		res.writeHead(dashRes.status, { 'Content-Type': 'application/json', ...CORS_HEADERS });
-		res.end(JSON.stringify({ error: `Dify returned ${dashRes.status}` }));
-		return;
-	}
-	if (data.code) {
-		console.error(`[AI] ✗ ${data.code}: ${data.message}`);
-		res.writeHead(dashRes.status, { 'Content-Type': 'application/json', ...CORS_HEADERS });
-		res.end(JSON.stringify({ error: `${data.code}: ${data.message}` }));
-		return;
-	}
+		console.log(`[AI] HTTP status: ${dashRes.status}`);
+		const rawText = await dashRes.text();
+		console.log(`[AI] raw preview: ${rawText.slice(0, 300)}`);
 
-	const content = data.data?.outputs?.out ?? '';
-	console.log(`[AI] ✓ ${type} - ${content.length} chars`);
-	res.writeHead(200, { 'Content-Type': 'application/json', ...CORS_HEADERS });
-	res.end(JSON.stringify({ success: true, content }));
+		let data: DifyResponse;
+		try {
+			data = JSON.parse(rawText) as DifyResponse;
+		} catch {
+			console.error('[AI] ✗ Failed to parse Dify response');
+			res.writeHead(502, { 'Content-Type': 'application/json', ...CORS_HEADERS });
+			res.end(JSON.stringify({ error: 'Failed to parse Dify response' }));
+			return;
+		}
+
+		if (dashRes.status >= 400) {
+			console.error(`[AI] ✗ HTTP ${dashRes.status}`);
+			res.writeHead(dashRes.status, { 'Content-Type': 'application/json', ...CORS_HEADERS });
+			res.end(JSON.stringify({ error: `Dify returned ${dashRes.status}` }));
+			return;
+		}
+		if (data.code) {
+			console.error(`[AI] ✗ ${data.code}: ${data.message}`);
+			res.writeHead(dashRes.status, { 'Content-Type': 'application/json', ...CORS_HEADERS });
+			res.end(JSON.stringify({ error: `${data.code}: ${data.message}` }));
+			return;
+		}
+
+		const content = data.data?.outputs?.out ?? '';
+		console.log(`[AI] ✓ ${type} - ${content.length} chars`);
+		res.writeHead(200, { 'Content-Type': 'application/json', ...CORS_HEADERS });
+		res.end(JSON.stringify({ success: true, content }));
+	} catch (err: unknown) {
+		console.error(`[AI] ✗ fetch failed:`, err instanceof Error ? err.message : String(err));
+		// 确保 res 没有被发送到客户端
+		if (!res.writableEnded) {
+			res.writeHead(502, { 'Content-Type': 'application/json', ...CORS_HEADERS });
+			res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Upstream request failed' }));
+		}
+	}
 }
