@@ -7,12 +7,24 @@ interface Props {
 }
 
 export default function TodoItem({ todo }: Props) {
-  const { toggleTodo, categories } = useTodoApp();
+  const { toggleTodo, categories, selectedIds, toggleSelect } = useTodoApp();
   const cat = categories.find(c => c.id === todo.category);
   const overdue = !todo.completed && todo.due && isOverdue(todo.due);
+  const isSelected = selectedIds.has(todo.id);
 
   return (
-    <div className={`todo-item${todo.completed ? ' completed' : ''}`} data-id={todo.id}>
+    <div className={`todo-item${todo.completed ? ' completed' : ''}${isSelected ? ' selected' : ''}`} data-id={todo.id}>
+      {/* 多选选择器 */}
+      <button
+        type="button"
+        className={`todo-multi-checkbox${isSelected ? ' checked' : ''}`}
+        onClick={() => toggleSelect(todo.id)}
+        aria-pressed={isSelected}
+        aria-label={isSelected ? '取消选中' : '选中此项'}
+        title={isSelected ? '取消选中' : '选中此项'}
+      >
+        {isSelected ? '✓' : ''}
+      </button>
       <div className={`todo-priority-bar ${todo.priority}`} />
       <div
         className={`todo-checkbox${todo.completed ? ' checked' : ''}`}
