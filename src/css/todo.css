@@ -175,3 +175,101 @@
   margin-bottom: 6px;
   color: var(--text-secondary);
 }
+
+/* ========== Multi-Select Toolbar ========== */
+.multi-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.multi-toolbar-top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  backdrop-filter: blur(12px);
+}
+
+.multi-toolbar-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.multi-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.multi-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.multi-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.multi-btn {
+  white-space: nowrap;
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: var(--danger-dark);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ========== Selected Item Highlight ========== */
+.todo-item.selected {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+
+/* ========== Multi-Select Checkbox ========== */
+.todo-multi-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 4px;
+  accent-color: var(--primary);
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  appearance: auto;
+}
+
+.todo-item:hover .todo-multi-checkbox,
+.todo-item:hover .todo-checkbox,
+.todo-item:hover .todo-actions {
+  opacity: 1;
+}
