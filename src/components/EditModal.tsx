@@ -30,7 +30,7 @@ export default function EditModal() {
     return () => {
       window.removeEventListener('open-edit', handler);
     };
-  	}, []);
+  }, [todos]);
 
   // Close on Escape key
   useEffect(() => {

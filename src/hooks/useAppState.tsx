@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useReducer, useCallback, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Todo, Category, AppState, ViewType, SortOrder, ToastMessage } from '../types';
@@ -9,12 +10,13 @@ interface Action {
   payload?: unknown;
 }
 
-/** Internal state shape — extends AppState with view/filter/search/sort */
+/** Internal state shape — extends AppState with view/filter/search/sort/selected */
 interface InternalState extends AppState {
   _view: ViewType;
   _categoryFilter: string | null;
   _search: string;
   _sort: SortOrder;
+  _selected: Set<string>; // 多选选中的 todo ID
 }
 
 /** Reducer managing all app state */
@@ -72,6 +74,19 @@ function reducer(state: InternalState, action: Action): InternalState {
     case 'SET_SORT': {
       return { ...state, _sort: action.payload as SortOrder };
     }
+    case 'TOGGLE_SELECT': {
+      const id = action.payload as string;
+      const selected = new Set(state._selected);
+      if (selected.has(id)) selected.delete(id); else selected.add(id);
+      return { ...state, _selected: selected };
+    }
+    case 'SELECT_ALL': {
+      const ids = (action.payload as string[]);
+      return { ...state, _selected: new Set(ids) };
+    }
+    case 'CLEAR_SELECTION': {
+      return { ...state, _selected: new Set() };
+    }
     default:
       return state;
   }
@@ -84,12 +99,22 @@ export interface TodoAppContextValue extends AppState {
   sort: SortOrder;
   theme: 'light' | 'dark';
   toasts: ToastMessage[];
+  /** 多选选中的 todo ID 集合 */
+  selectedIds: Set<string>;
   // Actions
   addTodo: (todo: Omit<Todo, 'id' | 'createdAt'>) => void;
   toggleTodo: (id: string) => void;
   updateTodo: (id: string, updates: Partial<Omit<Todo, 'id' | 'createdAt'>>) => void;
   deleteTodo: (id: string) => void;
   undoDelete: (todo: Todo) => void;
+  /** 切换单个 todo 的选中状态 */
+  toggleSelect: (id: string) => void;
+  /** 全选当前列表（传入所有可见 ID） */
+  selectAll: (ids: string[]) => void;
+  /** 清空选中状态 */
+  clearSelection: () => void;
+  /** 批量删除已选中的 todo */
+  batchDelete: (ids: string[]) => void;
   addCategory: (cat: Omit<Category, 'colorClass'>) => void;
   deleteCategory: (id: string) => void;
   switchView: (view: ViewType) => void;
@@ -111,6 +136,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     _categoryFilter: null,
     _search: '',
     _sort: 'created-desc',
+    _selected: new Set(),
   };
 
   const [state, dispatch] = useReducer(reducer, init);
@@ -140,7 +166,15 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     saveState({ todos: state.todos, categories: state.categories });
   }, [state.todos, state.categories]);
 
-  // --- Action creators ---
+  const showToast = useCallback((text: string, undoAction?: () => void) => {
+    const id = genId();
+    setToasts(prev => [...prev, { id, text, undoAction }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 5000);
+  }, []);
+
+  // --- Basic action creators ---
   const addTodo = useCallback((data: Omit<Todo, 'id' | 'createdAt'>) => {
     dispatch({ type: 'ADD_TODO', payload: { ...data, id: genId(), createdAt: Date.now() } });
   }, []);
@@ -187,13 +221,27 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_SORT', payload: s });
   }, []);
 
-  const showToast = useCallback((text: string, undoAction?: () => void) => {
-    const id = genId();
-    setToasts(prev => [...prev, { id, text, undoAction }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 5000);
+  // --- Multi-select action creators ---
+  const toggleSelect = useCallback((id: string) => {
+    dispatch({ type: 'TOGGLE_SELECT', payload: id });
   }, []);
+
+  const selectAll = useCallback((ids: string[]) => {
+    dispatch({ type: 'SELECT_ALL', payload: ids });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    dispatch({ type: 'CLEAR_SELECTION' });
+  }, []);
+
+  const batchDelete = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    showToast(`已删除 ${ids.length} 项`, () => {
+      clearSelection();
+    });
+    ids.forEach(id => dispatch({ type: 'DELETE_TODO', payload: id }));
+    clearSelection();
+  }, [showToast, clearSelection]);
 
   // --- Build context value from actual state ---
   const contextValue: TodoAppContextValue = {
@@ -205,7 +253,9 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     sort: state._sort,
     theme,
     toasts,
+    selectedIds: state._selected,
     addTodo, toggleTodo, updateTodo, deleteTodo, undoDelete,
+    toggleSelect, selectAll, clearSelection, batchDelete,
     addCategory, deleteCategory, switchView, switchCategory,
     setSearch, setSort, toggleTheme, showToast,
   };

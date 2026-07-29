@@ -7,7 +7,6 @@
 const http = require('node:http');
 const https = require('node:https');
 const { createServer } = require('node:http');
-const { parse } = require('node:url');
 
 // —— 从环境变量或 .env / .env.local 文件加载配置 ——
 const DOTENV_PATHS = [require('path').join(__dirname, '.env.local'), require('path').join(__dirname, '.env')];
@@ -44,6 +43,25 @@ if (!apiKeyBreakdown && !apiKeyMeeting) {
 }
 
 const PORT = parseInt(process.env.PROXY_PORT || '3000', 10);
+const TIMEOUT_MS = 60_000;    // Dify 工作流超时
+const MAX_RETRIES = 1;        // 最多重试 1 次
+const RETRY_DELAY_MS = 2_000; // 重试间隔 2s
+
+// —— 辅助：检测 HTML 响应 ——
+function isHtmlResponse(text) {
+  const lower = text.toLowerCase();
+  return lower.includes('<!doctype html>') || lower.includes('<html');
+}
+
+// —— 辅助：发送 JSON 响应 ——
+function sendJson(res, status, data, extraHeaders = {}) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    ...extraHeaders,
+  });
+  res.end(JSON.stringify(data));
+}
 
 const server = createServer(async (req, res) => {
   // CORS preflight
@@ -103,83 +121,109 @@ const server = createServer(async (req, res) => {
 
     console.log(`[Proxy] → Dify (${type}) url=${targetUrl.pathname}`);
 
-    const apiRes = await new Promise((resolve, reject) => {
-      const options = {
-        hostname: targetUrl.hostname,
-        path: targetUrl.pathname,
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload),
-        },
-      };
-      if (targetUrl.port) options.port = parseInt(targetUrl.port, 10);
-      const proxyReq = client.request(options, resolve);
-      proxyReq.on('error', reject);
-      proxyReq.write(payload);
-      proxyReq.end();
-    }).catch(err => {
-      console.error('[Proxy] ✗ fetch failed:', err.message);
-      throw new Error(`Dify API unreachable: ${err.message}`);
+    let lastError;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        console.log(`[Proxy] ↻ 重试 (${attempt}/${MAX_RETRIES})...`);
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+      }
+
+      const apiRes = await new Promise((resolve, reject) => {
+        const options = {
+          hostname: targetUrl.hostname,
+          path: targetUrl.pathname,
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload),
+            'Connection': 'keep-alive',
+          },
+        };
+        if (targetUrl.port) options.port = parseInt(targetUrl.port, 10);
+        let timeoutId;
+        const proxyReq = client.request(options, res => {
+          clearTimeout(timeoutId);
+          resolve(res);
+        });
+        timeoutId = setTimeout(() => {
+          proxyReq.destroy(new Error(`Timeout after ${TIMEOUT_MS}ms`));
+        }, TIMEOUT_MS);
+        proxyReq.on('error', err => {
+          clearTimeout(timeoutId);
+          reject(err);
+        });
+        proxyReq.write(payload);
+        proxyReq.end();
+      }).catch(err => {
+        lastError = err;
+        console.error('[Proxy] ✗ fetch failed:', err.message);
+        return null;
+      });
+
+      if (!apiRes) {
+        if (attempt < MAX_RETRIES) continue;
+        break;
+      }
+
+      const respChunks = [];
+      for await (const chunk of apiRes) {
+        respChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      let rawText;
+      try {
+        rawText = Buffer.concat(respChunks).toString();
+      } catch {
+        console.error('[Proxy] Failed to read response');
+        sendJson(res, 502, { error: 'Failed to read response from Dify' });
+        return;
+      }
+
+      console.log(`[Proxy] HTTP status: ${apiRes.statusCode}`);
+      console.log(`[Proxy] raw preview: ${rawText.slice(0, 300)}`);
+
+      // 检测 Cloudflare / WAF / CDN 返回的 HTML 拦截页面
+      if (isHtmlResponse(rawText)) {
+        const statusCode = apiRes.statusCode || 502;
+        console.error(`[Proxy] ✗ Received HTML instead of JSON (status=${statusCode})`);
+        lastError = new Error(`Received HTML instead of JSON (status=${statusCode})`);
+        if (attempt < MAX_RETRIES) continue; // 触发重试
+        sendJson(res, statusCode === 504 ? 504 : 502, {
+          error: statusCode === 504
+            ? 'Dify 处理超时（504）。大段会议文稿可能需要较长时间，请再试一次。'
+            : '收到非 JSON 响应（可能是 CDN/WAF 拦截），请稍后重试。',
+        });
+        return;
+      }
+
+      let respData;
+      try {
+        respData = JSON.parse(rawText);
+      } catch {
+        console.error('[Proxy] Invalid JSON:', rawText.slice(0, 200));
+        sendJson(res, 502, { error: 'Invalid response from Dify API' });
+        return;
+      }
+
+      if (respData.code) {
+        sendJson(res, apiRes.statusCode || 400, {
+          error: `${respData.code}: ${respData.message}`,
+        });
+        return;
+      }
+
+      const content = respData.data?.outputs?.out ?? '';
+      sendJson(res, 200, { success: true, content });
+      return; // 成功即退出
+    }
+
+    // 所有重试耗尽
+    sendJson(res, 504, {
+      error: lastError instanceof Error ? lastError.message : 'Request failed after retries',
     });
-
-    const respChunks = [];
-    for await (const chunk of apiRes) {
-      respChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    let rawText;
-    try {
-      rawText = Buffer.concat(respChunks).toString();
-    } catch {
-      console.error('[Proxy] Failed to read response');
-      res.writeHead(502, {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      });
-      res.end(JSON.stringify({ error: 'Failed to read response from Dify' }));
-      return;
-    }
-
-    console.log(`[Proxy] HTTP status: ${apiRes.statusCode}`);
-    console.log(`[Proxy] raw preview: ${rawText.slice(0, 300)}`);
-
-    let respData;
-    try {
-      respData = JSON.parse(rawText);
-    } catch {
-      console.error('[Proxy] Invalid JSON:', rawText.slice(0, 200));
-      res.writeHead(502, {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      });
-      res.end(JSON.stringify({ error: 'Invalid response from Dify API' }));
-      return;
-    }
-
-    if (respData.code) {
-      res.writeHead(apiRes.statusCode || 400, {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      });
-      res.end(JSON.stringify({ error: `${respData.code}: ${respData.message}` }));
-      return;
-    }
-
-    const content = respData.data?.outputs?.out ?? '';
-
-    res.writeHead(200, {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    });
-    res.end(JSON.stringify({ success: true, content }));
   } catch (err) {
     console.error('[Proxy Error]', err.message);
-    res.writeHead(502, {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    });
-    res.end(JSON.stringify({ error: err.message }));
+    sendJson(res, 502, { error: err.message });
   }
 });
 

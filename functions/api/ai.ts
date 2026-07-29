@@ -24,14 +24,17 @@ const CORS = {
 	'Access-Control-Max-Age': '86400',
 };
 
-// 从环境读取配置
-const env = {
-	DIFY_API_KEY_BREAKDOWN: process.env.DIFY_API_KEY_BREAKDOWN || '',
-	DIFY_API_KEY_MEETING: process.env.DIFY_API_KEY_MEETING || '',
-	DIFY_BASE_URL: process.env.DIFY_BASE_URL || 'https://api.dify.ai',
-};
+const TIMEOUT_MS = 60_000;      // Dify 工作流超时（原 30s 对长输入不够）
+const MAX_RETRIES = 1;          // 最多重试 1 次（应对偶发网关超时）
+const RETRY_DELAY_MS = 2_000;   // 重试间隔 2s
 
-export async function onRequestPost({ request, env }: any) {
+// —— 检测 HTML 响应（Cloudflare / WAF / CDN 拦截页面）——
+function isHtmlResponse(text: string): boolean {
+	const lower = text.toLowerCase();
+	return lower.includes('<!doctype html>') || lower.includes('<html');
+}
+
+export async function onRequestPost({ request, env }: { request: Request; env: { DIFY_API_KEY_BREAKDOWN?: string; DIFY_API_KEY_MEETING?: string; DIFY_BASE_URL?: string } }) {
 	const url = new URL(request.url);
 
 	// 解析请求体
@@ -50,13 +53,13 @@ export async function onRequestPost({ request, env }: any) {
 	}
 
 	// 根据 type 选择 API Key 和输入变量名
-	const apiKey = type === 'meeting' ? env.DIFY_API_KEY_MEETING : env.DIFY_API_KEY_BREAKDOWN;
+	const apiKey = type === 'meeting' ? (env as any)?.DIFY_API_KEY_MEETING : (env as any)?.DIFY_API_KEY_BREAKDOWN;
 	if (!apiKey) {
 		return jsonResponse({ error: `${type} API Key not configured` }, 500, url);
 	}
 
 	const inputVarName = type === 'meeting' ? 'raw_text' : 'string';
-	const baseUrl = env.DIFY_BASE_URL || 'https://api.dify.ai';
+	const baseUrl = (env as any)?.DIFY_BASE_URL || 'https://api.dify.ai';
 	const targetUrl = baseUrl.endsWith('/v1')
 		? `${baseUrl}/workflows/run`
 		: `${baseUrl}/v1/workflows/run`;
@@ -64,47 +67,96 @@ export async function onRequestPost({ request, env }: any) {
 	console.log(`[AI] → Dify workflow (${type}) target=${targetUrl}`);
 
 	try {
-		const res = await fetch(targetUrl, {
-			method: 'POST',
-			headers: {
-				Authorization: `Bearer ${apiKey}`,
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-				inputs: { [inputVarName]: query },
-				response_mode: 'blocking',
-				user: 'todo-app-client',
-			}),
-		});
+		let lastError: unknown | undefined;
 
-		const rawText = await res.text();
-		console.log(`[AI] HTTP status: ${res.status}`);
-		console.log(`[AI] raw preview: ${rawText.slice(0, 300)}`);
+		for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+			lastError = undefined;
 
-		let data;
-		try {
-			data = JSON.parse(rawText);
-		} catch {
-			console.error('[AI] ✗ Failed to parse response:', rawText.slice(0, 200));
-			return jsonResponse({ error: 'Failed to parse Dify response' }, 502, url);
+			if (attempt > 0) {
+				console.log(`[AI] ↻ 重试 (${attempt}/${MAX_RETRIES})...`);
+				await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+			}
+
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+			let res: Response;
+			try {
+				res = await fetch(targetUrl, {
+					method: 'POST',
+					headers: {
+						Authorization: `Bearer ${apiKey}`,
+						'Content-Type': 'application/json',
+						'Accept': 'application/json',
+					},
+					body: JSON.stringify({
+						inputs: { [inputVarName]: query },
+						response_mode: 'blocking',
+						user: 'todo-app-client',
+					}),
+					signal: controller.signal,
+				});
+			} catch (fetchErr) {
+				clearTimeout(timeoutId);
+				if ((fetchErr as Error).name === 'AbortError') {
+					lastError = new Error('Dify 处理超时，请稍后重试');
+					if (attempt < MAX_RETRIES) continue;
+					break;
+				}
+				throw fetchErr;
+			}
+			clearTimeout(timeoutId);
+
+			const rawText = await res.text();
+			console.log(`[AI] HTTP status: ${res.status}`);
+			console.log(`[AI] raw preview: ${rawText.slice(0, 300)}`);
+
+			// 检测 Cloudflare / WAF / CDN 返回的 HTML 拦截页面
+			if (isHtmlResponse(rawText)) {
+				const statusCode = res.status;
+				console.error(`[AI] ✗ Received HTML instead of JSON (status=${statusCode})`);
+
+				if (attempt < MAX_RETRIES) continue; // 触发重试
+
+				return jsonResponse({
+					error: statusCode === 504
+						? 'Dify 处理超时（504）。大段会议文稿可能需要较长时间，请再试一次。'
+						: '收到非 JSON 响应（可能是 CDN/WAF 拦截），请稍后重试。',
+				}, statusCode === 504 ? 504 : 502, url);
+			}
+
+			let data;
+			try {
+				data = JSON.parse(rawText);
+			} catch {
+				console.error('[AI] ✗ Failed to parse response:', rawText.slice(0, 200));
+				return jsonResponse({ error: 'Failed to parse Dify response' }, 502, url);
+			}
+
+			// Dify 错误处理
+			if (data.detail?.error) {
+				return jsonResponse({ error: data.detail.error }, 400, url);
+			}
+			if (data.code) {
+				console.error(`[AI] ✗ ${data.code}: ${data.message}`);
+				return jsonResponse(
+					{ error: `${data.code}: ${data.message}` },
+					res.status,
+					url,
+				);
+			}
+
+			const content = data.data?.outputs?.out ?? '';
+			console.log(`[AI] ✓ ${type} - ${content.length} chars`);
+			return jsonResponse({ success: true, content }, 200, url);
 		}
 
-		// Dify 错误处理
-		if (data.detail?.error) {
-			return jsonResponse({ error: data.detail.error }, 400, url);
-		}
-		if (data.code) {
-			console.error(`[AI] ✗ ${data.code}: ${data.message}`);
-			return jsonResponse(
-				{ error: `${data.code}: ${data.message}` },
-				res.status,
-				url,
-			);
-		}
-
-		const content = data.data?.outputs?.out ?? '';
-		console.log(`[AI] ✓ ${type} - ${content.length} chars`);
-		return jsonResponse({ success: true, content }, 200, url);
+		// 所有重试耗尽
+		return jsonResponse(
+			{ error: lastError instanceof Error ? lastError.message : 'Request failed after retries' },
+			504,
+			url,
+		);
 	} catch (err: unknown) {
 		console.error(`[AI] ✗ upstream failed:`, err instanceof Error ? err.message : String(err));
 		return jsonResponse(

@@ -22,21 +22,21 @@ export default {
 
     // —— OPTIONS preflight ——
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders(url) });
+      return new Response(null, { status: 204, headers: corsHeaders() });
     }
 
     // —— 只允许 POST /api/ai* 路径 ——
     if (url.pathname !== '/api/ai' && !url.pathname.startsWith('/api/ai?')) {
       return new Response(JSON.stringify({ error: 'Not found' }), {
         status: 404,
-        headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
       });
     }
 
     if (request.method !== 'POST') {
       return new Response(JSON.stringify({ error: 'Method not allowed' }), {
         status: 405,
-        headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
       });
     }
 
@@ -46,7 +46,7 @@ export default {
     } catch {
       return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
         status: 400,
-        headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
       });
     }
 
@@ -56,7 +56,7 @@ export default {
     if (!query) {
       return new Response(JSON.stringify({ error: 'Missing query parameter' }), {
         status: 400,
-        headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
       });
     }
 
@@ -65,7 +65,7 @@ export default {
     if (!apiKey) {
       return new Response(JSON.stringify({ error: `${type} API Key not configured` }), {
         status: 500,
-        headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
       });
     }
 
@@ -95,13 +95,13 @@ export default {
       if (data.detail?.error) {
         return new Response(JSON.stringify({ error: data.detail.error }), {
           status: 400,
-          headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
         });
       }
       if (data.code) {
         return new Response(JSON.stringify({ error: `${data.code}: ${data.message}` }), {
           status: res.status,
-          headers: { ...corsHeaders(url), 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
         });
       }
 
@@ -113,13 +113,13 @@ export default {
     } catch (err: unknown) {
       return new Response(
         JSON.stringify({ error: err instanceof Error ? err.message : 'Upstream request failed' }),
-        { status: 502, headers: { ...corsHeaders(url), 'Content-Type': 'application/json' } },
+        { status: 502, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } },
       );
     }
   },
 } satisfies ExportedHandler;
 
-function corsHeaders(origin: URL): HeadersInit {
+function corsHeaders(): HeadersInit {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
